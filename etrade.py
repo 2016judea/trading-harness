@@ -1,0 +1,93 @@
+"""E*TRADE API client: OAuth 1.0a handshake + thin REST helpers.
+
+E*TRADE uses OAuth 1.0a with an out-of-band (oob) verifier: you open an
+authorize URL in a browser, log in, and paste back the short code it shows.
+Access tokens are cached to .tokens (gitignored) and reused until they expire
+(tokens go inactive after ~2 hours idle and expire at US market midnight ET).
+"""
+from __future__ import annotations
+
+import json
+import os
+import webbrowser
+from pathlib import Path
+
+from dotenv import load_dotenv
+from requests_oauthlib import OAuth1Session
+
+load_dotenv()
+
+_ENV = os.getenv("ETRADE_ENV", "sandbox").lower()
+BASE = "https://api.etrade.com" if _ENV == "prod" else "https://apisb.etrade.com"
+
+_REQUEST_TOKEN_URL = "https://api.etrade.com/oauth/request_token"
+_ACCESS_TOKEN_URL = "https://api.etrade.com/oauth/access_token"
+_AUTHORIZE_URL = "https://us.etrade.com/e/t/etws/authorize"
+
+_KEY = os.getenv("ETRADE_CONSUMER_KEY")
+_SECRET = os.getenv("ETRADE_CONSUMER_SECRET")
+_TOKEN_CACHE = Path(__file__).parent / ".tokens"
+
+
+def _interactive_authorize():
+    """Run the full OAuth dance and return a (resource_owner_key, secret) pair."""
+    if not _KEY or not _SECRET:
+        raise SystemExit("Set ETRADE_CONSUMER_KEY and ETRADE_CONSUMER_SECRET in .env")
+
+    # 1. Request token (callback must be the literal string "oob").
+    oauth = OAuth1Session(_KEY, client_secret=_SECRET, callback_uri="oob")
+    fetch = oauth.fetch_request_token(_REQUEST_TOKEN_URL)
+    rt, rts = fetch["oauth_token"], fetch["oauth_token_secret"]
+
+    # 2. Send the user to authorize; they paste back a verifier code.
+    url = f"{_AUTHORIZE_URL}?key={_KEY}&token={rt}"
+    print("\nAuthorize this app in your browser:\n  " + url + "\n")
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+    verifier = input("Paste the verification code from E*TRADE: ").strip()
+
+    # 3. Exchange for an access token.
+    oauth = OAuth1Session(
+        _KEY,
+        client_secret=_SECRET,
+        resource_owner_key=rt,
+        resource_owner_secret=rts,
+        verifier=verifier,
+    )
+    tok = oauth.fetch_access_token(_ACCESS_TOKEN_URL)
+    pair = (tok["oauth_token"], tok["oauth_token_secret"])
+    _TOKEN_CACHE.write_text(json.dumps({"key": pair[0], "secret": pair[1]}))
+    return pair
+
+
+def session(force_reauth: bool = False) -> OAuth1Session:
+    """Return an authenticated OAuth1Session, reusing cached tokens if present."""
+    if not force_reauth and _TOKEN_CACHE.exists():
+        cached = json.loads(_TOKEN_CACHE.read_text())
+        key, secret = cached["key"], cached["secret"]
+    else:
+        key, secret = _interactive_authorize()
+    return OAuth1Session(
+        _KEY,
+        client_secret=_SECRET,
+        resource_owner_key=key,
+        resource_owner_secret=secret,
+    )
+
+
+def get(path: str, params: dict | None = None) -> dict:
+    """GET a v1 JSON endpoint, e.g. get('/v1/accounts/list')."""
+    s = session()
+    r = s.get(f"{BASE}{path}.json", params=params)
+    if r.status_code == 401:  # tokens expired/inactive — re-auth once.
+        s = session(force_reauth=True)
+        r = s.get(f"{BASE}{path}.json", params=params)
+    r.raise_for_status()
+    return r.json()
+
+
+def list_accounts() -> list[dict]:
+    data = get("/v1/accounts/list")
+    return data["AccountListResponse"]["Accounts"]["Account"]

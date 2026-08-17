@@ -1,0 +1,27 @@
+{
+  "_comment": [
+    "Copy to targets.json and edit.",
+    "Weights are fractions of investable capital (0.15 = 15%), not percentages.",
+    "A name set to 0.0 is a full exit.",
+    "'prices' is only needed for names you don't already hold — the positions CSV",
+    "supplies a price for everything you do hold.",
+    "'sell_unlisted': true also exits every held name absent from 'targets'."
+  ],
+
+  "cash_on_hand": 10000,
+  "cash_reserve": 5000,
+
+  "targets": {
+    "AAPL": 0.20,
+    "MSFT": 0.20,
+    "VTI": 0.30,
+    "KHC": 0.0
+  },
+
+  "prices": {
+    "MSFT": 430.15
+  },
+
+  "sell_unlisted": false,
+  "holidays": ["2026-06-19"]
+}
