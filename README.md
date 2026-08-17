@@ -104,10 +104,28 @@ table, each carrying a state, because a rule like "buy under $227" is true every
 day the price sits there — you want to act on the **crossing**, not the condition,
 or you re-decide a settled trade every morning.
 
-There's an [`.claude/skills/buffett-checklist/`](.claude/skills/buffett-checklist/)
-skill here too — a value-investing discipline lens for
+## Why the journal is a text file and not a database
+
+The format comes out of a working method written up in
+[*Getting an AI to do a given thing is really pretty simple*](https://aidanjude.substack.com/p/getting-an-ai-to-do-a-given-thing):
+give an agent a concise set of instructions with clear goals and explicit rules;
+write the rules down somewhere they can be *checked* rather than remembered; and
+harvest them from work you actually did, rather than guessing at them up front.
+
+A journal in that shape is readable by a person and by a model, which is the
+point. The rules are explicit because well-defined bounds make a reasoning agent
+more deterministic, and each one carries its reason because a rule without its
+reason gets rationalized around the first time it's inconvenient. The gate
+register exists so that an agent reading the file acts on a *crossing* instead of
+re-litigating a settled trade every time it's asked.
+
+[`.claude/skills/buffett-checklist/`](.claude/skills/buffett-checklist/) is the
+same idea aimed at a single decision — a value-investing discipline lens for
 [Claude Code](https://claude.com/claude-code), for arguing with yourself before
 you buy.
+
+It also implies a division of labor, which this repo takes literally: the
+analysis decides and shows its grounds, and **you** place the order.
 
 ## Notes
 
