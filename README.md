@@ -3,12 +3,15 @@
 Pull your own E*TRADE account over the API, work out what actually happened, and
 decide the next trade *before* you're in it.
 
-Two halves that don't need each other:
+Three parts, and you can take any one of them:
 
 - **The client** — a working [E*TRADE REST API](https://developer.etrade.com/home)
   wrapper in ~90 lines, plus analysis on top: FIFO realized P&L, position dumps,
   target-allocation order lists, price history and seasonality.
-- **The harness** — [`JOURNAL.template.md`](JOURNAL.template.md), a written format
+- **The skills** — [`.claude/skills/`](.claude/skills/), seven of them, so an agent
+  can run the whole review without being told how. One entry point that
+  forward-references a skill per tool.
+- **The journal** — [`JOURNAL.template.md`](JOURNAL.template.md), a written format
   for pre-committing why you own a thing and what would make you sell it, so the
   hold/exit call isn't made live in a bad moment.
 
@@ -92,6 +95,37 @@ would overstate your gains.
 browser User-Agent. It's there because Yahoo's chart API started hard-429ing in
 2026 and Stooq put a JavaScript proof-of-work wall in front of theirs.
 
+## The skills
+
+[`.claude/skills/`](.claude/skills/) — written for [Claude
+Code](https://claude.com/claude-code), but they're plain markdown and read fine in
+any agent. **Start at `portfolio-review`**; it decides which pulls a given question
+needs and hands off to the skill that owns each one.
+
+```
+portfolio-review        ← entry point: "review my book", "should I sell X"
+├── etrade-pull         positions + transactions; owns OAuth and its failures
+├── realized-pnl        what the trades actually did, and the counterfactual
+├── price-history       where a name sits in its own cycle
+├── buffett-checklist   a skeptical second read on a single name
+├── rebalance-plan      a decision, turned into an order list
+└── trade-journal       write the exit down before it's tested
+```
+
+Each tool skill owns its own quirks so nothing rediscovers them: the token that
+dies at midnight Eastern lives in `etrade-pull`, the ~3-year retention that makes a
+realized total *not* lifetime performance lives in `realized-pnl`, the fact that
+seasonality on ten years is n=10 per month lives in `price-history`.
+
+Every rule in them carries its reason, which is deliberate — **a rule without its
+reason gets rationalized around the first time it's inconvenient**, and these govern
+money. The load-bearing one, in `portfolio-review`:
+
+> **Never place an order, and never imply one was placed.** Nothing in this repo
+> can. The analysis decides and shows its grounds; the person executes. An agent
+> that both decides and executes removes the one checkpoint where a human can catch
+> a wrong premise.
+
 ## The journal
 
 The code tells you what happened. [`JOURNAL.template.md`](JOURNAL.template.md) is
@@ -119,10 +153,12 @@ reason gets rationalized around the first time it's inconvenient. The gate
 register exists so that an agent reading the file acts on a *crossing* instead of
 re-litigating a settled trade every time it's asked.
 
-[`.claude/skills/buffett-checklist/`](.claude/skills/buffett-checklist/) is the
-same idea aimed at a single decision — a value-investing discipline lens for
-[Claude Code](https://claude.com/claude-code), for arguing with yourself before
-you buy.
+The same method explains the shape of `.claude/skills/`. Every tool an agent has to
+reach for gets its own skill definition, and skills cross-reference each other like
+a paper — so when a task crosses outside one skill's scope it points at the skill
+that owns that ground instead of restating it, and an assumption can be checked
+rather than inherited blind. That's why the OAuth failure modes are documented once,
+in `etrade-pull`, and everything else just links to it.
 
 It also implies a division of labor, which this repo takes literally: the
 analysis decides and shows its grounds, and **you** place the order.

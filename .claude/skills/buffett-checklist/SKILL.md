@@ -162,7 +162,16 @@ When invoked on a specific name (held or candidate):
 
 Refresh or verify any specific Buffett quote, letter, or recent Berkshire move
 before citing it — positions and public statements change, and this file is a
-framework snapshot, not a live feed. For the holder's own positions, this repo's
-`fetch_portfolio.py` pulls them from E*TRADE (`ETRADE_ENV=prod`, requires a
-nightly OAuth re-auth); `backtest_holding.py` quantifies the temperament section
-against trades actually made.
+framework snapshot, not a live feed.
+
+- Current positions and weights: **[[etrade-pull]]**.
+- The temperament section, quantified against trades actually made:
+  **[[realized-pnl]]** — its counterfactual is what turns "you cut losers too
+  early" from an accusation into a number.
+- Where a name sits in its own cycle, for the margin-of-safety read:
+  **[[price-history]]**.
+- A written invalidation to check the "when Buffett actually sells" test against:
+  **[[trade-journal]]**.
+
+Invoked as one step of **[[portfolio-review]]**, which decides when a skeptical
+read is the thing that's needed.
