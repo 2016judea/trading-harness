@@ -9,6 +9,7 @@ tokens.json
 data/*
 !data/example_portfolio.csv
 !data/example_transactions.csv
+!data/example_orders.csv
 targets.json
 JOURNAL.md
 

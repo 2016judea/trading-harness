@@ -56,6 +56,30 @@ crosses → it stays fired until you deliberately re-arm it, with a reason.
 | YYYY-MM-DD | TICKER | lot turns long-term | trimming becomes tax-efficient | ARMED |
 | YYYY-MM-DD | TICKER | time limit on an unconfirmed thesis | exit trigger 3 | not yet near |
 
+**A. DATED** — above. Calendar, no price condition. No broker order expresses these.
+
+**B. PORTFOLIO-STATE** — caps, pair limits, cash earmarks. *No broker order can
+express these either*, which is the whole reason they live in a file.
+
+**C. PRICE — these CAN be resting broker orders.** Split out precisely because
+they can, and therefore because there are two different states: written down, and
+actually in the market. `gate_check.py` reads this table and tells you which.
+
+| # | Name | Trigger | Last | Distance | State |
+|---|---|---|---|---|---|
+| C1 | TICKER | ≥ $000.00 (what re-rate this would be) | $000.00 | +0.0% | ARMED |
+| C2 | TICKER | ≥ $000.00 | $000.00 | +0.0% | ARMED |
+
+> **A gate with no number is a hole, not a covered exit.** If a row's trigger
+> reads "when the multiple expands well beyond growth," it will be decided live —
+> the exact condition this file exists to prevent. Leave it visible and marked
+> rather than inventing a number in the same breath as noticing the gap: picking
+> one *there* is a live decision wearing a pre-commitment's clothes. `gate_check.py`
+> reports these rows as `⬛ unchecked` and never as passing.
+
+**D. FUNDAMENTAL INVALIDATIONS** — exit at any price. Cannot be automated; they
+need judgement, which is why no watchdog replaces reading the file.
+
 ---
 
 ## Positions

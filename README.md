@@ -8,7 +8,10 @@ Three parts, and you can take any one of them:
 - **The client** — a working [E*TRADE REST API](https://developer.etrade.com/home)
   wrapper in ~90 lines, plus analysis on top: FIFO realized P&L, position dumps,
   target-allocation order lists, price history and seasonality.
-- **The skills** — [`.claude/skills/`](.claude/skills/), seven of them, so an agent
+- **The reconciler** — [`gate_check.py`](gate_check.py), which answers the one
+  question a journal cannot: *is the gate I wrote down actually resting at the
+  broker?* Twice it wasn't, and both times a human found it by hand.
+- **The skills** — [`.claude/skills/`](.claude/skills/), eight of them, so an agent
   can run the whole review without being told how. One entry point that
   forward-references a skill per tool.
 - **The journal** — [`JOURNAL.template.md`](JOURNAL.template.md), a written format
@@ -27,9 +30,15 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 cp data/example_transactions.csv data/transactions.csv
-python realized_pnl.py                       # FIFO-matched closed lots
+python realized_pnl.py                       # FIFO-matched closed lots + win rate
 python rebalance.py --portfolio data/example_portfolio.csv --targets targets.example.json
 python price_history.py AAPL                 # real data, no key needed
+
+# the reconciler, on example data: an over-cap position with no stop, a
+# good-for-day order that dies tonight, and two loose legs over-committing a lot
+python gate_check.py --portfolio data/example_portfolio.csv \
+                     --orders data/example_orders.csv \
+                     --journal JOURNAL.template.md --allow-stale
 ```
 
 ## Connect a real account
@@ -46,6 +55,8 @@ agreement. Default is `sandbox` — set `ETRADE_ENV=prod` for your real account.
 python -c "import etrade, json; print(json.dumps(etrade.list_accounts(), indent=2))"
 python fetch_portfolio.py       # -> data/portfolio.csv
 python fetch_transactions.py    # -> data/transactions.csv
+python fetch_orders.py          # -> data/orders.csv + data/orders_raw.json
+python gate_check.py            # journal gates vs what is actually resting
 ```
 
 The first call opens E*TRADE's authorize page in a browser and asks you to paste
@@ -73,6 +84,25 @@ back a short verifier code.
   cash transactions each, dated 2013. You cannot validate any trade-analysis path
   against it. See [SCHEMA.md](SCHEMA.md).
 
+### The orders endpoint has its own traps
+
+- **A 204 No Content is the normal answer when nothing matches.** It returns an
+  empty body rather than an empty list, so a naive `.json()` raises on a perfectly
+  good response. `etrade.get()` returns `{}` instead.
+- **No date range returns a short window, silently** — same shape as transactions.
+- **The default is not `status=OPEN`,** and you do not want it to be: an `EXPIRED`
+  row is the diagnostic for a good-for-day order that died overnight, and filtering
+  to open orders hides exactly the failure you are looking for.
+- **One order carries a list of details, each carrying a list of instruments.** A
+  bracket or multi-leg order is several rows sharing an `orderId`; the sibling
+  pointers (`replacesOrderId`, `replacedByOrderId`) are what distinguish a linked
+  OCO pair from two loose orders that over-commit the same shares.
+- **The field mapping is not yet validated against a live account** — the sandbox
+  has zero orders. `fetch_orders.py` therefore writes the raw payload to
+  `data/orders_raw.json` every run. Read it once, on the first real pull, before
+  trusting a green report: a mis-mapped `stopPrice` reports a protected position
+  that isn't.
+
 ## What each script does
 
 | Script | |
@@ -82,7 +112,9 @@ back a short verifier code.
 | `fetch_portfolio.py` | Current positions, cost basis, unrealized P&L → CSV. |
 | `fetch_transactions.py` | Full transaction history, paginated → CSV. |
 | `load.py` | Normalizes the raw CSV; splits trades from cash movements. |
-| `realized_pnl.py` | FIFO-matches sells against buys. Closed lots, best/worst, by symbol. |
+| `fetch_orders.py` | Every order in a window, flattened to one row per leg → CSV. |
+| `gate_check.py` | Journal gates vs resting orders. Non-zero exit when something is missing. |
+| `realized_pnl.py` | FIFO-matches sells against buys. Closed lots, win rate, best/worst, by symbol. |
 | `rebalance.py` | Target weights → order list, with a tax tag per row. Optional DCA schedule. |
 | `price_history.py` | ~10y daily bars + monthly seasonality. No API key. |
 | `backtest_holding.py` | For every loss you took: what if you'd held instead? |
@@ -105,6 +137,7 @@ needs and hands off to the skill that owns each one.
 ```
 portfolio-review        ← entry point: "review my book", "should I sell X"
 ├── etrade-pull         positions + transactions; owns OAuth and its failures
+├── order-check         is the gate you wrote down actually resting at the broker?
 ├── realized-pnl        what the trades actually did, and the counterfactual
 ├── price-history       where a name sits in its own cycle
 ├── buffett-checklist   a skeptical second read on a single name
@@ -137,6 +170,13 @@ caught up" would look like. Plus a gate register: every dated trigger in one
 table, each carrying a state, because a rule like "buy under $227" is true every
 day the price sits there — you want to act on the **crossing**, not the condition,
 or you re-decide a settled trade every morning.
+
+And a register still only records a *decision*. Whether the order exists is a fact
+about the broker, and the two drift apart silently: a good-for-day limit expires
+overnight, a stop gets written down and never placed. That gap is what
+`gate_check.py` closes, and it is the reason the price gates live in their own
+section of the register — they are the only ones a broker order can express, so
+they are the only ones that can be in two states at once.
 
 ## Why the journal is a text file and not a database
 

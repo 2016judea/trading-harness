@@ -54,13 +54,56 @@ def realized() -> tuple[pd.DataFrame, pd.DataFrame]:
     return pd.DataFrame(closed), pd.DataFrame(orphan_sells)
 
 
+def summary(closed: pd.DataFrame, orphans: pd.DataFrame) -> dict:
+    """Win rate and average win/loss over the closed lots.
+
+    A win rate is the cheapest honest read on a book, and the two averages
+    beside it are what make it meaningful: 15% wins at a 6x payoff and 60%
+    wins at 0.4x are different businesses, and the rate alone can't tell them
+    apart.
+
+    **Two reasons this is not lifetime performance, and both matter:**
+
+      * The API retains ~3 years. Anything older is simply absent.
+      * Sells whose buy predates the window are excluded, not counted as
+        zero-basis wins. `orphans` carries them; their proceeds are known and
+        their P&L is not. Folding them in would inflate the win rate with
+        trades whose cost nobody knows.
+    """
+    if not len(closed):
+        return {}
+    wins = closed[closed["gain"] > 0]["gain"]
+    losses = closed[closed["gain"] < 0]["gain"]
+    return {
+        "lots": len(closed),
+        "net": closed["gain"].sum(),
+        "wins": len(wins),
+        "losses": len(losses),
+        "win_rate_pct": len(wins) / len(closed) * 100,
+        "avg_win": wins.mean() if len(wins) else 0.0,
+        "avg_loss": losses.mean() if len(losses) else 0.0,
+        "payoff": (wins.mean() / abs(losses.mean())) if len(wins) and len(losses) else None,
+        "avg_hold_days": closed["hold_days"].mean(),
+        "excluded_orphan_sells": len(orphans),
+    }
+
+
 if __name__ == "__main__":
     pd.set_option("display.width", 160)
     closed, orphans = realized()
     closed = closed.sort_values("gain")
 
-    print(f"=== {len(closed)} closed lots | "
-          f"net realized: ${closed['gain'].sum():,.0f} ===\n")
+    st = summary(closed, orphans)
+    print(f"=== {st['lots']} closed lots | net realized: ${st['net']:,.0f} ===")
+    print(f"  win rate      {st['win_rate_pct']:.1f}%  "
+          f"({st['wins']}W / {st['losses']}L)")
+    print(f"  avg win       ${st['avg_win']:,.0f}")
+    print(f"  avg loss      ${st['avg_loss']:,.0f}"
+          + (f"   payoff {st['payoff']:.2f}x" if st["payoff"] else ""))
+    print(f"  avg hold      {st['avg_hold_days']:.0f} days")
+    print(f"  NOT lifetime  ~3y API retention; "
+          f"{st['excluded_orphan_sells']} pre-window sell(s) excluded, not "
+          f"counted as zero-basis wins\n")
 
     print("WORST 10 closed trades:")
     print(closed.head(10).to_string(index=False))

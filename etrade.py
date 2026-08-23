@@ -85,6 +85,12 @@ def get(path: str, params: dict | None = None) -> dict:
         s = session(force_reauth=True)
         r = s.get(f"{BASE}{path}.json", params=params)
     r.raise_for_status()
+    # A 204 with an empty body is a legitimate "nothing matched" from some
+    # endpoints (notably /orders when the account has no orders in the window).
+    # raise_for_status() has already cleared real errors, so an empty body here
+    # is data, not a fault — and r.json() would raise on it.
+    if r.status_code == 204 or not r.content.strip():
+        return {}
     return r.json()
 
 

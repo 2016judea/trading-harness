@@ -43,6 +43,15 @@ trades**. That reads exactly like "this person doesn't trade." See
    news. *Two names with one thesis is one position wearing a disguise, and it
    won't show up in a per-name weight table.*
 
+1b. **Is anything they believe is live actually in the market?** →
+   **[[order-check]]**. Run it before reasoning on top of any gate, and *first* if
+   a position is over its cap. *A written stop and a resting stop are different
+   states, and a journal cannot tell them apart — one book sat 100% in a single
+   name with its stop existing only on paper, and the register said the stop was
+   its only remaining risk control. Both were true at once.* If it reports an
+   unprotected over-cap position, that is the review's headline; everything about
+   weights and P&L waits.
+
 2. **What did their trades actually do?** → **[[realized-pnl]]**. Closed lots,
    FIFO-matched, best and worst, and the by-symbol roll-up. This is the difference
    between what someone believes about their investing and what happened.
@@ -70,7 +79,9 @@ trades**. That reads exactly like "this person doesn't trade." See
    that changes nothing on paper will be re-litigated from scratch next month.
 
 Skip steps that don't bear on the question. A "should I sell X" question usually
-needs 1, 3, 5 and 7 and nothing else.
+needs 1, 3, 5 and 7 and nothing else. **Step 1b is the exception — never skip it
+when the answer will lean on a gate**, because its whole job is to catch the case
+where the gate you are reasoning from does not exist.
 
 ## Rules
 
