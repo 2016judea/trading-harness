@@ -11,6 +11,11 @@ Three parts, and you can take any one of them:
 - **The reconciler** — [`gate_check.py`](gate_check.py), which answers the one
   question a journal cannot: *is the gate I wrote down actually resting at the
   broker?* Twice it wasn't, and both times a human found it by hand.
+- **The valuation** — [`sec_financials.py`](sec_financials.py) pulls a company's
+  as-reported figures from the SEC's free XBRL API, and
+  [`owner_earnings.py`](owner_earnings.py) / [`compare.py`](compare.py) turn them
+  into owner earnings, a reverse DCF, and a ranked screen. No API key, and no
+  number typed by hand.
 - **The skills** — [`.claude/skills/`](.claude/skills/), eight of them, so an agent
   can run the whole review without being told how. One entry point that
   forward-references a skill per tool.
@@ -20,6 +25,34 @@ Three parts, and you can take any one of them:
 
 **Nothing here can place a trade.** Every script reads, computes and prints. The
 order lists are lists — you type the orders yourself.
+
+## Valuation, without credentials or a key
+
+The SEC half needs no key — only a contact address, because SEC blocks clients
+that don't identify one:
+
+```bash
+export SEC_USER_AGENT="Your Name you@example.com"
+python3 sec_financials.py CTVA --years 7          # as-reported 10-K lines
+python3 owner_earnings.py CTVA --price 82.81 --bond 5.19
+python3 compare.py --bond 5.19 RMD=232.45 KO=91.99 CTVA=82.81
+```
+
+`owner_earnings.py` prints owner earnings by year, return on tangible capital,
+what the market is asking in owner-earnings terms, a margin-of-safety ladder, and
+a **reverse DCF** — the growth today's price requires, which is the only part of
+a valuation nobody can argue with. `compare.py` ranks a set on the gap between
+the growth a price requires and the growth the business has actually delivered.
+
+Two things it does on purpose. It **refuses**: fewer than three positive
+owner-earnings years in five, a loss in the latest year, or owner earnings more
+than 1.6x actual free cash flow (which means the D&A add-back is carrying a
+goodwill impairment, not depreciation) all return "too hard" instead of a number.
+And it **calibrates** — run it on a business Buffett actually owns before
+believing any absolute verdict, because a 10% hurdle against a 5%+ long bond
+calls almost everything overvalued. Un-calibrated, it rates Coca-Cola more
+overvalued than most of what you'd screen against it. The durable outputs are the
+relative ones.
 
 ## Try it without credentials
 
@@ -206,6 +239,9 @@ analysis decides and shows its grounds, and **you** place the order.
 ## Notes
 
 Python 3.9+. Dependencies: `requests`, `requests-oauthlib`, `python-dotenv`, `pandas`.
+
+`SEC_USER_AGENT` must be set for anything touching SEC data; responses cache for
+a day under `~/.cache/sec-financials`.
 
 `.env`, `.tokens`, `targets.json` and everything in `data/` except the examples
 are gitignored — your keys and your positions shouldn't end up in a commit.

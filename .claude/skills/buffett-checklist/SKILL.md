@@ -146,9 +146,15 @@ When invoked on a specific name (held or candidate):
    "this doesn't pass, it's a thematic bet, evaluate it as one."
 2. Name the moat mechanism, or say there isn't one yet. Early-cycle names often
    don't have a moat *yet* — that's the bet, be honest about it.
-3. Rough owner-earnings / valuation sanity check if the financials support one.
-   For pre-moat or early-cycle names, substitute "what has to be true" for a
-   formal intrinsic-value number.
+3. Owner-earnings / valuation check — **run [[intrinsic-value]], don't estimate
+   it here.** That skill owns the arithmetic (owner earnings, return on tangible
+   capital, the reverse DCF, the margin-of-safety ladder) and the refusal rules
+   that stop a goodwill impairment or a carve-out year from being valued as
+   earnings. It also carries the calibration rule: **never deliver an absolute
+   "fair value" without running the same model on a business Buffett actually
+   owns** — un-calibrated, this model called Coca-Cola more overvalued than the
+   name being screened. For pre-moat or early-cycle names it will refuse outright
+   ("too hard"); substitute "what has to be true" and say so plainly.
 4. Margin-of-safety read: is the current price already assuming the thesis plays
    out, or is there room for the thesis to be right *and* the stock to re-rate?
 5. Management / capital-allocation quick read if public filings support one.
@@ -164,6 +170,8 @@ Refresh or verify any specific Buffett quote, letter, or recent Berkshire move
 before citing it — positions and public statements change, and this file is a
 framework snapshot, not a live feed.
 
+- The valuation arithmetic, and the data behind it: **[[intrinsic-value]]** and
+  **[[sec-financials]]**. This file is the lens; those two are the numbers.
 - Current positions and weights: **[[etrade-pull]]**.
 - The temperament section, quantified against trades actually made:
   **[[realized-pnl]]** — its counterfactual is what turns "you cut losers too
