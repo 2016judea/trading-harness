@@ -74,6 +74,18 @@ python gate_check.py --portfolio data/example_portfolio.csv \
                      --journal JOURNAL.template.md --allow-stale
 ```
 
+`place_order.py` needs a live account (a preview is a real API call), but its
+journal parser doesn't:
+
+```bash
+python -c "from pathlib import Path; import place_order as p; \
+           print(p.journal_legs(Path('JOURNAL.template.md')))"
+```
+
+Note the stop sorts first regardless of the order you wrote the rows in. If
+placement is interrupted halfway, you want to be holding the half that protects
+you.
+
 ## Connect a real account
 
 ```bash
@@ -136,6 +148,31 @@ back a short verifier code.
   trusting a green report: a mis-mapped `stopPrice` reports a protected position
   that isn't.
 
+### ⚠️ There is no OCO. Find out here, not in your plan.
+
+`priceType` covers MARKET / LIMIT / STOP / STOP_LIMIT / trailing / hidden;
+`orderTerm` covers GOOD_UNTIL_CANCEL / GOOD_FOR_DAY / GOOD_TILL_DATE /
+IMMEDIATE_OR_CANCEL / FILL_OR_KILL; and the only linkage fields are
+`conditionType` (`CONTINGENT_GTE` / `CONTINGENT_LTE`) against **another symbol's**
+price. **Nothing links two orders on the same symbol so that one cancels the
+other.** OCO is a Power-E*TRADE UI construct, not an API capability.
+
+So a bracket written as *"976 shares, limit $88 / stop $75, one-cancels-other"* is
+not expressible here at all. The sequential form is — stop on everything first,
+then the take-profit tranches — and it is **over-committed by construction**,
+which is safe only because the two sides straddle the last price and cannot both
+print. The cost is that any fill leaves a stale, oversized leg on the other side.
+`place_order.py reconcile` finds those, and running it after a fill is a required
+step rather than an optional one.
+
+### A preview creates no order, and that makes it the test you want
+
+`POST /orders/preview` validates the whole payload against the live account —
+symbol, price sanity, buying power, position — and returns the `previewId` that
+`place` requires. It costs nothing and changes nothing. **Use it as your
+integration test; do not use the sandbox for orders,** which holds no positions
+and therefore exercises nothing about a sell.
+
 ## What each script does
 
 | Script | |
@@ -147,6 +184,7 @@ back a short verifier code.
 | `load.py` | Normalizes the raw CSV; splits trades from cash movements. |
 | `fetch_orders.py` | Every order in a window, flattened to one row per leg → CSV. |
 | `gate_check.py` | Journal gates vs resting orders. Non-zero exit when something is missing. |
+| `place_order.py` | Transmits the exits your journal already committed to. Preview-first, dry-run by default, ten rails. |
 | `realized_pnl.py` | FIFO-matches sells against buys. Closed lots, win rate, best/worst, by symbol. |
 | `rebalance.py` | Target weights → order list, with a tax tag per row. Optional DCA schedule. |
 | `price_history.py` | ~10y daily bars + monthly seasonality. No API key. |
@@ -159,6 +197,53 @@ would overstate your gains.
 `price_history.py` reads Nasdaq's public quote endpoint, which needs only a
 browser User-Agent. It's there because Yahoo's chart API started hard-429ing in
 2026 and Stooq put a JavaScript proof-of-work wall in front of theirs.
+
+## Placing an order: the narrow scope, on purpose
+
+`place_order.py` transmits exits **that are already written down**. It decides
+nothing, has no opinion about price, and cannot open a position.
+
+```bash
+python place_order.py show           # held vs resting
+python place_order.py from-journal   # dry-run every ⚑ EXIT PLAN block
+python place_order.py from-journal --place
+python place_order.py reconcile      # stale legs after a fill
+```
+
+The scope is narrow for a reason worth stating plainly. In the book this tooling
+came out of, **every failure was a transmission failure, not a decision failure**
+— a good-for-day stop that expired overnight, a concentrated entry that went in
+with nothing resting behind it, and the same stop still unplaced six days later.
+The levels were correctly reasoned and written down in advance every time. So
+automating the *decision* would have fixed none of it, while removing the one
+judgement worth keeping. Automating *transmission* fixes all three.
+
+The rails, each traceable to something that actually goes wrong:
+
+| | |
+|---|---|
+| **R1** | preview always; the `previewId` is echoed into the place body |
+| **R2** | SELL-only unless `--i-am-buying` — on margin, `marginBuyingPower` reads ~2x your real cash |
+| **R3** | never sell more than is held, checked live rather than from a cached CSV |
+| **R4** | resting + new may not over-commit *per side*; the stop/limit straddle is the allowed exception |
+| **R5** | a sell STOP must be below last, a sell LIMIT above — inverted, either becomes an instant market order |
+| **R6** | refuse anything >35% from last, because R5 alone accepts a $7.50 stop meant as $75.00 |
+| **R7** | GTC by default; a GOOD_FOR_DAY stop is refused without `--force-day` |
+| **R8** | dry run by default |
+| **R9** | every transmitted order is logged to `data/placed_orders.log` |
+| **R10** | MARKET refused outright — an entry is a decision and belongs to a human looking at a quote |
+
+### Don't build a scheduler for this
+
+The reflex after finding an unplaced stop is a nightly cron. It cannot work here:
+**the access token expires every midnight ET and re-auth needs a browser**, so an
+unattended check 401s every morning — and a watchdog that reports "cannot check"
+100% of the time is worse than none, because its silence gets read as all-clear.
+
+**A GTC order resting at the broker needs no token, no cron and no watchdog. It is
+already the durable thing.** The monitoring gap exists only while the order is
+unplaced; placing it correctly closes the gap with no infrastructure at all.
+`gate_check.py` stays what it is — the audit you run when you sit down.
 
 ## The skills
 

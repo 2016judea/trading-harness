@@ -94,6 +94,43 @@ def get(path: str, params: dict | None = None) -> dict:
     return r.json()
 
 
+def _send(method: str, path: str, payload: dict) -> dict:
+    """POST/PUT a v1 JSON endpoint with a JSON body.
+
+    Order endpoints are the only writes this repo makes, so the retry policy is
+    deliberately different from get(): **a write is never retried automatically.**
+    A 401 here means re-auth, and re-authing mid-write then replaying the body
+    risks transmitting the same order twice. Raise instead and let the caller
+    re-auth and re-decide.
+    """
+    s = session()
+    url = f"{BASE}{path}.json"
+    hdr = {"Content-Type": "application/json", "Accept": "application/json",
+           "consumerKey": _KEY or ""}
+    r = s.request(method, url, json=payload, headers=hdr)
+    if r.status_code == 401:
+        raise RuntimeError(
+            "401 on a WRITE. Token is dead. Re-auth, then re-run deliberately — "
+            "this is never retried automatically because replaying an order body "
+            "can place it twice."
+        )
+    try:
+        body = r.json() if r.content.strip() else {}
+    except ValueError:
+        body = {"_raw": r.text}
+    if r.status_code >= 400:
+        raise RuntimeError(f"{method} {path} -> {r.status_code}: {body}")
+    return body
+
+
+def post(path: str, payload: dict) -> dict:
+    return _send("POST", path, payload)
+
+
+def put(path: str, payload: dict) -> dict:
+    return _send("PUT", path, payload)
+
+
 def list_accounts() -> list[dict]:
     data = get("/v1/accounts/list")
     return data["AccountListResponse"]["Accounts"]["Account"]

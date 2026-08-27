@@ -77,6 +77,38 @@ actually in the market. `gate_check.py` reads this table and tells you which.
 > one *there* is a live decision wearing a pre-commitment's clothes. `gate_check.py`
 > reports these rows as `⬛ unchecked` and never as passing.
 
+**⚑ EXIT PLAN — the machine-readable half of section C.** A price gate in the C
+table is prose for a human. The block below is the same decision in a form
+`place_order.py` can transmit without interpreting anything. Write one per
+position that has a committed exit; delete it when the position closes.
+
+## ⚑ EXIT PLAN — TICKER
+
+| Leg | Action | Qty | Type | Price | Term |
+|---|---|---|---|---|---|
+| STOP | SELL | 1000 | STOP | 75.00 | GTC |
+| TP1 | SELL | 500 | LIMIT | 88.00 | GTC |
+| TP2 | SELL | 500 | LIMIT | 90.50 | GTC |
+
+> **Why a table and not a sentence.** Everything else in this file is written for
+> a human to reason with, and should stay that way. This one block is written for
+> a script to *execute*, and those are different jobs. A parser over prose either
+> guesses or misses, and a miss here is silent: the file reads exactly the same
+> whether the order is in the market or not.
+>
+> **Order matters — the stop goes first.** It is the only leg that caps a loss;
+> the take-profits only forgo an upside. If placement is interrupted halfway you
+> want to be holding the half that protects you.
+>
+> **This will look over-committed, and that is deliberate.** 1,000 shares of stop
+> plus 1,000 shares of limit against 1,000 held is fine *only* because the two
+> sides straddle the current price and cannot both print. **Brokers whose API has
+> no OCO — E\*TRADE's does not — leave you no other way to express a bracket.**
+> The cost is that a fill on any leg leaves the others stale and oversized, so
+> `place_order.py reconcile` is a required step after any fill, not an optional
+> one. *Write a workaround down with its cleanup attached, or the workaround
+> becomes the next silent failure.*
+
 **D. FUNDAMENTAL INVALIDATIONS** — exit at any price. Cannot be automated; they
 need judgement, which is why no watchdog replaces reading the file.
 
