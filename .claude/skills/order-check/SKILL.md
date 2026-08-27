@@ -1,17 +1,23 @@
 ---
 name: order-check
 description: >-
-  Verify that the gates a journal says are live are actually resting at the broker.
-  Use when someone says "did my order get placed", "is my stop in", "what orders do
-  I have open", "check my open orders", "is that limit still live", after any entry
-  into a position larger than its cap, after a consolidation or a rebalance, and as
-  the first step of any review that is about to reason on top of a gate. Also use
-  when a journal names a stop or limit and nothing has confirmed it exists.
+  Verify that the gates a journal says are live are actually resting at the broker —
+  and transmit the ones that aren't. Use when someone says "did my order get placed",
+  "is my stop in", "what orders do I have open", "check my open orders", "is that
+  limit still live", "place my stop", "put the bracket in", "get the orders in",
+  and ALSO on any question about how a POSITION or a TRADE is doing: "check in on
+  the X trade", "how is X doing", "did that work out". A position check-in IS a gate
+  check. Use after any entry into a position larger than its cap, after a
+  consolidation or a rebalance, and as the first step of any review about to reason
+  on top of a gate. Also when a journal names a stop or limit and nothing has
+  confirmed it exists.
 grounded: >-
   2026-08-20 — a book went 100% into one name and the orders endpoint returned zero
   open orders; the stop existed only on paper. Ten days earlier a GOOD_FOR_DAY limit
   had expired overnight and the stock traded through the level unwatched. Both were
-  found by hand, which is why this is a script.
+  found by hand, which is why this is a script. **2026-08-26**: the script existed,
+  had never been run, and the stop was still unplaced six days on — so detection
+  alone was not enough and `place_order.py` was added.
 ---
 
 # Check the orders that are supposed to exist
@@ -97,6 +103,53 @@ sandbox has **zero orders** to check it with (see `SCHEMA.md`). The raw payload 
 written to `data/orders_raw.json` on every run for exactly this reason. **On the
 first live run, read the raw JSON and confirm the columns before trusting a green
 report** — a mis-mapped `stopPrice` reports a protected position that isn't.
+
+---
+
+# Placing it: `place_order.py`
+
+Detection was not enough. In the book this came from, the check was written three
+days after the failure it was for, diagnosed it correctly on its first run, and
+**that first run was six days late** — because running it was still a thing a human
+had to remember. *A watchdog that requires a human to run it is not a watchdog.*
+
+```bash
+python place_order.py show           # held vs resting
+python place_order.py from-journal   # dry-run every ⚑ EXIT PLAN block
+python place_order.py from-journal --place
+python place_order.py reconcile      # stale legs after a fill
+```
+
+**It transmits; it does not decide.** It reads `⚑ EXIT PLAN` tables already written
+in the journal and refuses to invent a level. Keep that boundary: **every failure
+worth automating away here was a transmission failure, not a decision failure** —
+the levels were reasoned correctly and written down in advance every time.
+Automating the decision would fix none of them and would remove the one judgement
+worth keeping.
+
+## ⚠️ There is no OCO, so "report OCO/bracket when it exceeds" needs a caveat
+
+The rule above — *say OCO/bracket when resting sell quantity exceeds shares held* —
+was written before this was checked. **E\*TRADE's API has no OCO field**: the only
+linkage is `conditionType` against *another symbol's* price. So an over-commitment
+cannot be resolved by linking the orders; it can only be resolved sequentially.
+
+Which means the over-commitment is sometimes **correct and deliberate**: a
+full-size stop plus full-size take-profit limits is the only way to express a
+bracket, and it is safe because the two sides straddle the last price and cannot
+both print. **Distinguish the two cases before calling it a fault** — two same-side
+sells over-committing is a real error; a stop and a limit straddling last is the
+intended structure. What it does require is cleanup: any fill leaves the other side
+stale and oversized, and `place_order.py reconcile` is the step that catches it.
+
+## Don't build a scheduler
+
+The reflex after finding an unplaced stop is a nightly cron. **The access token
+expires every midnight ET and re-auth needs a browser**, so an unattended check
+401s every morning — and a watchdog reporting "cannot check" 100% of the time is
+worse than none, because its silence reads as all-clear. **A GTC order resting at
+the broker needs no token and no cron.** The gap exists only while the order is
+unplaced. See **[[etrade-pull]]**.
 
 ## See also
 

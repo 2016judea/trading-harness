@@ -64,3 +64,52 @@ If a pull hangs with no output, this is why. Kill it and use `auth_cli.py`.
 - **A request with no date range silently returns only the last ~month.**
   `fetch_transactions.py` always sends an explicit window for this reason.
 - Field shapes and the sandbox's exact limitations are documented in `SCHEMA.md`.
+
+## Writing: orders can be placed, and the API's limits shape the design
+
+`etrade.py` exposes `post()` / `put()`; the transmitter is `place_order.py`, owned
+by **[[order-check]]**. Four tool facts:
+
+- **⚠️ There is NO OCO / bracket / one-cancels-other field.** `priceType` covers
+  MARKET / LIMIT / STOP / STOP_LIMIT / trailing / hidden; `orderTerm` covers
+  GOOD_UNTIL_CANCEL / GOOD_FOR_DAY / GOOD_TILL_DATE / IMMEDIATE_OR_CANCEL /
+  FILL_OR_KILL; the only linkage is `conditionType` (`CONTINGENT_GTE` /
+  `CONTINGENT_LTE`) against **another symbol's** price. OCO is a Power-E*TRADE UI
+  construct. *Any plan prescribing "an OCO bracket" describes something the API
+  cannot do — say so rather than trying.*
+- **A write is NEVER auto-retried on a 401.** `get()` re-auths and replays;
+  `_send()` deliberately raises instead. Replaying an order body after a token
+  refresh can transmit the same order twice, and a duplicate stop is a duplicate
+  exit.
+- **A preview creates no order**, so `POST /orders/preview` is a free, safe,
+  end-to-end validation against the live account and returns the `previewId` that
+  `place` requires. **Use preview as the integration test; never use the sandbox
+  for orders** — it holds no positions, so nothing about a sell is exercised.
+- **`clientOrderId` is capped at 20 alphanumeric characters.** Longer or
+  punctuated ids fail with an error that reads like an auth problem.
+
+Endpoints: `orders/preview`, `orders/place`, `orders/{id}/change/preview`,
+`orders/{id}/change/place`, `orders/cancel` (a PUT taking `{"CancelOrderRequest":
+{"orderId": N}}`).
+
+## `/orders` is also the only SIMULTANEOUS price record you get
+
+`Instrument[].averageExecutionPrice` on an `EXECUTED` order is a real fill, and
+`executedTime` is stamped per leg. **When several legs execute in the same minute,
+those fills are simultaneous prices for every name involved** — which is what makes
+a "should I have bought the other one instead" comparison honest, with no
+close-vs-intraday fudging. Nothing else in this API gives you that.
+
+## ⚠️ A cash-identity reconciliation is NOT a fill price
+
+If a fill hasn't posted yet, the tempting move is to solve for it: *proceeds +
+prior cash − cost = the residual the broker reports.* **Don't.** Real instance:
+that arithmetic produced `~$380.00` against an actual fill of **$377.955** — off
+by $2.045/share — and it failed in the *flattering* direction, recording a sell as
+better than the quote when it was worse.
+
+Solving an identity for its one unknown silently absorbs every unmodelled term —
+fees, unsettled credits — into precisely the number you wanted. **It cannot come
+out inconsistent, so it never warns you.** Read the fill off `/orders`, or write
+"unknown." Never off an identity, and never off the limit price: a limit fills at
+or *better* than its limit.
