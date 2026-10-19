@@ -13,9 +13,21 @@ import pandas as pd
 from load import trades
 
 
-def realized() -> tuple[pd.DataFrame, pd.DataFrame]:
-    df = trades().sort_values("transactionDate")
-    lots = defaultdict(deque)        # symbol -> queue of [qty, price, date]
+def _fee(r) -> float:
+    v = r.get("brokerage.fee", 0.0)
+    return 0.0 if v is None or pd.isna(v) else float(v)
+
+
+def _calendar_days(a, b) -> int:
+    """Holding period in calendar days, the way a lot date is read: bought
+    Monday 10:00, sold Tuesday 09:35 is ONE day held, not zero. Subtracting the
+    timestamps and truncating undercounts by a day roughly half the time."""
+    return (b.normalize() - a.normalize()).days
+
+
+def realized(df: pd.DataFrame | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+    df = (trades() if df is None else trades(df)).sort_values("transactionDate", kind="stable")
+    lots = defaultdict(deque)        # symbol -> queue of [qty, price, date, fee_per_share]
     closed, orphan_sells = [], []
 
     for _, r in df.iterrows():
@@ -23,23 +35,27 @@ def realized() -> tuple[pd.DataFrame, pd.DataFrame]:
         qty = abs(float(r["brokerage.quantity"]))
         price = float(r["brokerage.price"])
         date = r["transactionDate"]
+        fee = _fee(r)
         if r["transactionType"] == "Bought":
-            lots[sym].append([qty, price, date])
+            lots[sym].append([qty, price, date, fee / qty if qty else 0.0])
             continue
 
-        # Sold: match FIFO against open buy lots.
+        # Sold: match FIFO against open buy lots. Fees on both sides come out
+        # of the gain, pro-rata to the shares this lot closes -- the broker
+        # charges them on the trade, so a P&L that ignores them is overstated.
+        sell_fee_ps = fee / qty if qty else 0.0
         remaining = qty
         while remaining > 1e-9 and lots[sym]:
             lot = lots[sym][0]
             take = min(remaining, lot[0])
-            gain = (price - lot[1]) * take
+            gain = (price - lot[1]) * take - (lot[3] + sell_fee_ps) * take
             closed.append({
                 "symbol": sym, "qty": take,
                 "buy_date": lot[2], "buy_price": lot[1],
                 "sell_date": date, "sell_price": price,
                 "gain": gain,
-                "return_pct": (price / lot[1] - 1) * 100 if lot[1] else None,
-                "hold_days": (date - lot[2]).days,
+                "return_pct": gain / (lot[1] * take) * 100 if lot[1] else None,
+                "hold_days": _calendar_days(lot[2], date),
             })
             lot[0] -= take
             remaining -= take

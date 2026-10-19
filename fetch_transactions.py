@@ -25,13 +25,22 @@ def fetch_account(account_id_key: str, start=None, end=None) -> list[dict]:
     if end:
         params["endDate"] = _mmddyyyy(end)
 
-    rows, marker = [], None
+    rows, seen, marker = [], set(), None
     while True:
         if marker:
             params["marker"] = marker
         data = etrade.get(f"/v1/accounts/{account_id_key}/transactions", params)
         resp = data.get("TransactionListResponse", {})
-        rows.extend(resp.get("Transaction", []))
+        # The marker is INCLUSIVE: the next page starts AT the row it names,
+        # so the last row of one page is the first row of the next. A 349-row
+        # pull carried six such repeats, one per page boundary, and two of
+        # them were buys the FIFO matcher then double-counted.
+        for r in resp.get("Transaction", []):
+            tid = r.get("transactionId")
+            if tid is not None and tid in seen:
+                continue
+            seen.add(tid)
+            rows.append(r)
         marker = resp.get("marker")
         if not marker:
             break

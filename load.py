@@ -11,6 +11,10 @@ from pathlib import Path
 import pandas as pd
 
 _DATE_COLS = ["transactionDate", "postDate", "brokerage.settlementDate"]
+# The API's epoch timestamps are UTC. Read as naive UTC, an after-hours fill at
+# 19:50 ET lands on TOMORROW's date (seen 2025-12-01, a VT sell dated 12-02),
+# so every date in this repo is on the exchange's clock.
+MARKET_TZ = "America/New_York"
 
 
 def load(path: str | Path = "data/transactions.csv") -> pd.DataFrame:
@@ -22,9 +26,18 @@ def load(path: str | Path = "data/transactions.csv") -> pd.DataFrame:
         if col in df.columns:
             s = pd.to_numeric(df[col], errors="coerce")
             unit = "ms" if s.dropna().median() > 1e11 else "s"
-            df[col] = pd.to_datetime(s, unit=unit)
+            df[col] = pd.to_datetime(s, unit=unit, utc=True).dt.tz_convert(MARKET_TZ)
 
-    df = df.sort_values("transactionDate").reset_index(drop=True)
+    # The transactions endpoint pages with an INCLUSIVE marker: the next page
+    # starts at the row the marker names, so every page boundary comes back
+    # twice. fetch_transactions.py now drops those; this guards a CSV pulled
+    # before it did (six boundary rows in a 349-row pull, two of them buys
+    # that the FIFO matcher then counted as lots that were never bought).
+    if "transactionId" in df.columns:
+        df = df.drop_duplicates(subset="transactionId")
+
+    # Stable: rows that share a timestamp keep the API's order.
+    df = df.sort_values("transactionDate", kind="stable").reset_index(drop=True)
 
     # Classify by transactionType into coarse buckets for analysis. A "trade" is
     # specifically a buy/sell of a security — dividends/interest carry a symbol
