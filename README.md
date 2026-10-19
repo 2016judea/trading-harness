@@ -86,6 +86,19 @@ Note the stop sorts first regardless of the order you wrote the rows in. If
 placement is interrupted halfway, you want to be holding the half that protects
 you.
 
+## Tests
+
+```bash
+python -m pytest tests
+```
+
+Nothing in `tests/` touches E*TRADE: every pull is a stub, and a fixture trips
+any test that tries to open a session. The suite pins the traps the scripts
+encode — the inclusive pagination marker that repeats a row at every page
+boundary, the zero-order pull that must still write a CSV, holding periods in
+calendar days on the exchange's clock, fees in the realized P&L, a partial fill
+counting only the shares still working, and the rails in `place_order.py`.
+
 ## Connect a real account
 
 ```bash

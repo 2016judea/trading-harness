@@ -74,8 +74,14 @@ def windows(bars: list[tuple[dt.date, float]]) -> dict[str, float]:
         prior = [b for b in bars if b[0] <= last_date - dt.timedelta(days=days)]
         if prior:
             res[label] = 100 * (last_px / prior[-1][1] - 1)
-    ytd = [b for b in bars if b[0] >= dt.date(last_date.year, 1, 1)]
-    if ytd:
+    # YTD is measured from the PRIOR year's last close, not the first close of
+    # this year -- the latter drops the first session's move entirely.
+    jan1 = dt.date(last_date.year, 1, 1)
+    before = [b for b in bars if b[0] < jan1]
+    ytd = [b for b in bars if b[0] >= jan1]
+    if before:
+        res["ytd"] = 100 * (last_px / before[-1][1] - 1)
+    elif ytd:
         res["ytd"] = 100 * (last_px / ytd[0][1] - 1)
     hi_date, hi_px = max(bars, key=lambda b: b[1])
     res["off_high"] = 100 * (last_px / hi_px - 1)

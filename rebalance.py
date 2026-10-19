@@ -58,9 +58,16 @@ def plan(portfolio_csv: str | Path = "data/portfolio.csv",
     cash_reserve = float(cfg.get("cash_reserve", 0))
 
     df = pd.read_csv(portfolio_csv)
-    held_value = dict(zip(df.symbol, df.marketValue))
-    held_price = dict(zip(df.symbol, df.lastPrice))
-    held_gain = dict(zip(df.symbol, df.totalGain))
+    # One row per (account, symbol): a name held in two accounts is two rows,
+    # and a dict built straight off the columns keeps only the last one. The
+    # total still counted both, so the name read under-held and the plan said
+    # BUY what was already owned. Sum per symbol first.
+    by_sym = df.groupby("symbol", sort=False).agg(
+        marketValue=("marketValue", "sum"), totalGain=("totalGain", "sum"),
+        lastPrice=("lastPrice", "last"))
+    held_value = by_sym["marketValue"].to_dict()
+    held_price = by_sym["lastPrice"].to_dict()
+    held_gain = by_sym["totalGain"].to_dict()
 
     total = df["marketValue"].sum() + cash_on_hand
     investable = total - cash_reserve
@@ -85,7 +92,10 @@ def plan(portfolio_csv: str | Path = "data/portfolio.csv",
         rows.append({
             "symbol": sym,
             "cur_$": round(cur),
-            "cur_%": round(100 * cur / total, 1) if total else 0.0,
+            # Same denominator as tgt_%: a name sitting exactly on target reads
+            # as on target. Against `total` the two columns disagreed by the
+            # reserve's share and the gap they implied was not the delta.
+            "cur_%": round(100 * cur / investable, 1),
             "tgt_%": round(100 * tgt_pct, 1),
             "delta_$": round(delta),
             "price": px,
