@@ -43,23 +43,46 @@ def _mmddyyyy(s: str) -> str:
     return datetime.strptime(s, "%Y-%m-%d").strftime("%m%d%Y")
 
 
+MARKET_TZ = "America/New_York"
+
+# One row per (order, detail, instrument). Named here so an empty pull still
+# writes a header: a bare newline is not a CSV, and gate_check.py crashed on it
+# -- in the one state (zero orders) it exists to report.
+COLUMNS = [
+    "_accountId", "orderId", "orderType", "status", "orderTerm", "priceType",
+    "symbol", "securityType", "orderAction", "orderedQuantity", "filledQuantity",
+    "limitPrice", "stopPrice", "stopLimitPrice", "averageExecutionPrice",
+    "placedTime", "executedTime", "orderValue", "allOrNone", "marketSession",
+    "replacesOrderId", "replacedByOrderId",
+]
+
+
 def _ts(v):
-    """Epoch ms -> datetime, tolerating absent/zero."""
+    """Epoch ms -> datetime on the exchange's clock, tolerating absent/zero.
+    The epoch is UTC; a naive read labels a 12:23 ET fill as 16:23."""
     if v in (None, "", 0, "0"):
         return None
-    return pd.to_datetime(int(v), unit="ms")
+    return pd.to_datetime(int(v), unit="ms", utc=True).tz_convert(MARKET_TZ)
 
 
 def fetch_account(account_id_key: str, start: str, end: str) -> list[dict]:
     """Every order in the window, paginated. Returns raw E*TRADE Order dicts."""
     params = {"count": 100, "fromDate": _mmddyyyy(start), "toDate": _mmddyyyy(end)}
-    orders, marker = [], None
+    orders, seen, marker = [], set(), None
     while True:
         if marker:
             params["marker"] = marker
         data = etrade.get(f"/v1/accounts/{account_id_key}/orders", params)
         resp = data.get("OrdersResponse", {}) or {}
-        orders.extend(resp.get("Order", []) or [])
+        # The marker is inclusive (same convention as the transactions
+        # endpoint, where it repeated every page boundary), so an order seen
+        # on the previous page is dropped rather than flattened twice.
+        for o in resp.get("Order", []) or []:
+            oid = o.get("orderId")
+            if oid is not None and oid in seen:
+                continue
+            seen.add(oid)
+            orders.append(o)
         marker = resp.get("marker")
         if not marker:
             break
@@ -126,7 +149,7 @@ def main():
     # E*TRADE's documented shape and the sandbox has zero orders to validate it
     # (see SCHEMA.md) — so the first live run is the first real test of it.
     Path("data/orders_raw.json").write_text(json.dumps(raw, indent=2))
-    df = pd.DataFrame(rows)
+    df = pd.DataFrame(rows, columns=COLUMNS)
     df.to_csv("data/orders.csv", index=False)
     print(f"\nWrote {len(df)} order legs -> data/orders.csv"
           f"  (raw payload -> data/orders_raw.json)")

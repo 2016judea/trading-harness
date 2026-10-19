@@ -86,8 +86,22 @@ def load_frames(portfolio: Path, orders: Path, max_age_hours: float):
         if age_h > max_age_hours:
             stale.append(f"{p.name} is {age_h/24:.1f} days old")
     pf = pd.read_csv(portfolio)
-    od = pd.read_csv(orders) if orders.stat().st_size > 0 else pd.DataFrame()
+    # Zero orders at the broker is the 8/20 state and the reason this script
+    # exists. fetch_orders.py used to write a bare newline for it, which is
+    # not "empty" by size and not a CSV by content -- read_csv raised and the
+    # report never rendered. A header-only or blank file is an empty book.
+    try:
+        od = pd.read_csv(orders)
+    except pd.errors.EmptyDataError:
+        od = pd.DataFrame()
     return pf, od, stale
+
+
+def _open_qty(r) -> float:
+    """Shares still working on a leg. PARTIAL is a resting status, and what
+    rests is ordered minus filled -- counting the full order against the
+    position overstates a stop's cover and invents an over-commitment."""
+    return (_num(r.get("orderedQuantity")) or 0.0) - (_num(r.get("filledQuantity")) or 0.0)
 
 
 def tier1(pf: pd.DataFrame, od: pd.DataFrame, cap_pct: float) -> list[tuple[str, str]]:
@@ -112,7 +126,7 @@ def tier1(pf: pd.DataFrame, od: pd.DataFrame, cap_pct: float) -> list[tuple[str,
             & (resting["orderAction"].astype(str).str.upper().isin(SELL_ACTIONS))
             & (resting["stopPrice"].apply(lambda v: (_num(v) or 0) > 0))
         ] if len(resting) else pd.DataFrame()
-        covered = sum(_num(q) or 0 for q in stops.get("orderedQuantity", []))
+        covered = sum(_open_qty(r) for _, r in stops.iterrows())
         if covered <= 0:
             out.append(("CRIT",
                 f"{sym} is {h['pct']:.2f}% of the book (cap {cap_pct:.0f}%) with "
@@ -141,7 +155,7 @@ def tier1(pf: pd.DataFrame, od: pd.DataFrame, cap_pct: float) -> list[tuple[str,
     # 3. Resting sell quantity above the shares held.
     for sym, grp in resting.groupby(resting["symbol"].astype(str).str.upper()):
         sells = grp[grp["orderAction"].astype(str).str.upper().isin(SELL_ACTIONS)]
-        want = sum(_num(q) or 0 for q in sells.get("orderedQuantity", []))
+        want = sum(_open_qty(r) for _, r in sells.iterrows())
         have = held.get(sym, {}).get("qty", 0.0)
         linked = sells[["replacesOrderId", "replacedByOrderId"]].notna().any().any() \
             if {"replacesOrderId", "replacedByOrderId"}.issubset(sells.columns) else False
@@ -181,6 +195,10 @@ def parse_journal_levels(text: str) -> tuple[list[dict], list[str]]:
             gid = re.search(r"\*\*(T\d)\*\*", row)
             if not gid:
                 continue
+            # A gate that fired is struck through (~~976 sh at $88.00~~) and
+            # stays in the row as the record. It is not a level any more: read
+            # as one it was reported PAPER ONLY nine days after it filled.
+            row = re.sub(r"~~.*?~~", "", row)
             gid = gid.group(1)
             label = re.sub(r"[*]", "", row.split("|")[2]).strip() if row.count("|") > 2 else ""
             cell = row.split("|")[3] if row.count("|") > 3 else ""
@@ -215,7 +233,7 @@ def parse_journal_levels(text: str) -> tuple[list[dict], list[str]]:
     if csec:
         for row in re.findall(r"^\|\s*(C\d+)\s*\|(.*)$", csec.group(1), re.M):
             gid, rest = row
-            cells = [c.strip() for c in rest.split("|")]
+            cells = [c.strip() for c in re.sub(r"~~.*?~~", "", rest).split("|")]
             sym = re.sub(r"[*\s]", "", cells[0]) if cells else None
             trig = cells[1] if len(cells) > 1 else ""
             state = cells[-2] if len(cells) >= 2 else ""
@@ -253,7 +271,11 @@ def tier2(levels: list[dict], holes: list[str], od: pd.DataFrame,
                                 f"— DORMANT, no position to sell."))
             continue
         if g["kind"] == "DATE":
-            days = (datetime.strptime(g["date"], "%Y-%m-%d") - today).days
+            # Whole dates, not timestamps: midnight-of-exit minus now is a
+            # negative fraction on the day itself (-1) and a positive one the
+            # day before (0), so an exit due TOMORROW read "0 day(s) out".
+            today_d = today.date() if isinstance(today, datetime) else today
+            days = (datetime.strptime(g["date"], "%Y-%m-%d").date() - today_d).days
             sev = "CRIT" if days <= 0 else ("WARN" if days <= 3 else "OK")
             out.append((sev, f"{g['id']} {g['symbol']} dated exit {g['date']} — "
                              f"{days} day(s) out. No broker order expresses this; "
