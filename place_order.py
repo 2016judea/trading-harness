@@ -106,7 +106,7 @@ import argparse
 import json
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import etrade
@@ -141,26 +141,51 @@ def positions(acct: dict) -> dict[str, dict]:
     return out
 
 
+RESTING_LOOKBACK_DAYS = 720     # the endpoint keeps two years; a GTC can be old
+
+
 def resting(acct: dict) -> list[dict]:
-    """Flatten every still-executable order leg."""
-    out = []
-    data = etrade.get(f"/v1/accounts/{acct['accountIdKey']}/orders", {"count": "100"})
-    for o in (data.get("OrdersResponse", {}).get("Order") or []):
-        for d in o.get("OrderDetail") or []:
-            if d.get("status") not in RESTING:
+    """Flatten every still-executable order leg.
+
+    R4 and `reconcile` are only as good as this list. Two things made it
+    short: the orders endpoint returns a narrow window when no date range is
+    sent (the trap fetch_orders.py already encodes), and it pages by marker.
+    A GTC stop placed months ago that this missed would let a second
+    full-size stop through R4 -- the over-commitment the rail exists to stop.
+    """
+    out, seen = [], set()
+    end = datetime.now()
+    params = {"count": "100",
+              "fromDate": (end - timedelta(days=RESTING_LOOKBACK_DAYS)).strftime("%m%d%Y"),
+              "toDate": end.strftime("%m%d%Y")}
+    marker = None
+    while True:
+        if marker:
+            params["marker"] = marker
+        data = etrade.get(f"/v1/accounts/{acct['accountIdKey']}/orders", params)
+        resp = data.get("OrdersResponse", {}) or {}
+        for o in resp.get("Order") or []:
+            if o.get("orderId") in seen:        # inclusive marker repeats a row
                 continue
-            for ins in d.get("Instrument") or []:
-                out.append({
-                    "orderId": o.get("orderId"),
-                    "symbol": (ins.get("Product") or {}).get("symbol"),
-                    "action": ins.get("orderAction"),
-                    "qty": float(ins.get("orderedQuantity", 0)) - float(ins.get("filledQuantity", 0)),
-                    "priceType": d.get("priceType"),
-                    "limitPrice": d.get("limitPrice"),
-                    "stopPrice": d.get("stopPrice"),
-                    "orderTerm": d.get("orderTerm"),
-                    "status": d.get("status"),
-                })
+            seen.add(o.get("orderId"))
+            for d in o.get("OrderDetail") or []:
+                if d.get("status") not in RESTING:
+                    continue
+                for ins in d.get("Instrument") or []:
+                    out.append({
+                        "orderId": o.get("orderId"),
+                        "symbol": (ins.get("Product") or {}).get("symbol"),
+                        "action": ins.get("orderAction"),
+                        "qty": float(ins.get("orderedQuantity", 0)) - float(ins.get("filledQuantity", 0)),
+                        "priceType": d.get("priceType"),
+                        "limitPrice": d.get("limitPrice"),
+                        "stopPrice": d.get("stopPrice"),
+                        "orderTerm": d.get("orderTerm"),
+                        "status": d.get("status"),
+                    })
+        marker = resp.get("marker")
+        if not marker:
+            break
     return out
 
 
@@ -365,7 +390,18 @@ def journal_legs(path: Path) -> list[dict]:
 def _run(acct, legs, args):
     held, rest = positions(acct), resting(acct)
     ok = True
+    # Stops are sorted first so an interrupted run leaves the protective half
+    # in the market. A stop that is REFUSED and then followed by its limits
+    # leaves the other half: take-profits resting on a position with no
+    # floor. So when transmitting, a failed stop halts that symbol's legs.
+    halted: set[str] = set()
     for leg in legs:
+        if leg["symbol"] in halted:
+            ok = False
+            print(f"\n── {leg.get('label') or leg['symbol']}")
+            print(f"   ⛔ NOT PLACED — {leg['symbol']}'s stop did not go in, and a "
+                  "take-profit without its stop is the unprotected half.")
+            continue
         last = last_price(leg["symbol"])
         print(f"\n── {leg.get('label') or leg['symbol']}")
         print(f"   {leg['action']} {leg['qty']:,.0f} {leg['symbol']} {leg['priceType']} "
@@ -387,9 +423,13 @@ def _run(acct, legs, args):
         except Refused as e:
             ok = False
             print(f"   🔴 REFUSED — {e}")
+            if args.place and "STOP" in (leg["priceType"] or ""):
+                halted.add(leg["symbol"])
         except Exception as e:
             ok = False
             print(f"   🔴 ERROR — {e}")
+            if args.place and "STOP" in (leg["priceType"] or ""):
+                halted.add(leg["symbol"])
     return 0 if ok else 1
 
 
