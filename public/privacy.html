@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Privacy · Trading Harness</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<style>
+:root{--wall:#f4f1ea;--ink:#16211d;--muted:#5f6a64;--accent:#13322a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--wall:#101714;--ink:#ece6d8;--muted:#9aa59f;--accent:#e2b649}}
+:root[data-theme="dark"]{color-scheme:dark;--wall:#101714;--ink:#ece6d8;--muted:#9aa59f;--accent:#e2b649}
+body{margin:0;background:var(--wall);color:var(--ink);font:400 16px/1.6 "Avenir Next","Helvetica Neue",Helvetica,Arial,sans-serif;padding:0 20px}
+main{max-width:620px;margin:0 auto;padding-block:48px}
+h1{font:600 34px/1.1 Georgia,"Times New Roman",serif}
+h2{font-size:17px;margin-top:28px}
+a{color:var(--accent)} p.m{color:var(--muted);font-size:14px}
+</style>
+<script>window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)}</script><script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<main>
+<h1>Privacy</h1>
+<p class="m">Last updated November 20, 2026. Trading Harness, by Brick and Mortar AI LLC, Saint Paul, Minnesota. Not affiliated with E*TRADE or any broker.</p>
+
+<h2>No account, no brokerage access</h2>
+<p>The connector needs no sign-in and never asks for brokerage credentials. It has no connection to any broker and cannot place, preview or change an order.</p>
+
+<h2>What it receives, and what it keeps</h2>
+<p>It receives only what the assistant sends with a tool call: a ticker and a price, or the CSV text of an export you chose to paste (transactions, positions, open orders, and optionally journal text). That text is read in memory to compute the answer and dropped when the call ends. It is not written to disk, logged, or shared. The connector does not receive your conversation.</p>
+
+<h2>Where the numbers come from</h2>
+<p>Company figures come from the SEC's public XBRL API (data.sec.gov), and the long-bond yield from the U.S. Treasury's daily par yield curve (home.treasury.gov). Neither request carries anything about you. Share prices come from you or your assistant.</p>
+
+<h2>What is counted</h2>
+<p>Each tool call sends one anonymous event to PostHog: which tool, whether it worked, how long it took, how many rows or companies it handled, and which app made the call (Claude, ChatGPT and so on, read from the user agent). No tickers, no amounts, no CSV content. Each event gets a random ID, so calls can't be linked to each other or to a person, and no IP address is stored with it.</p>
+<p>These pages use Vercel Web Analytics, which counts visits without cookies.</p>
+
+<h2>Not advice</h2>
+<p>The tools calculate from public filings and the data you provide. Nothing they return is investment, tax or legal advice.</p>
+
+<h2>Contact</h2>
+<p>Questions and problems: <a href="https://github.com/2016judea/trading-harness/issues">github.com/2016judea/trading-harness/issues</a></p>
+</main>
+</body>
+</html>

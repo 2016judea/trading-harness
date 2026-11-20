@@ -1,0 +1,16 @@
+# Only the server and the scripts it imports ship. data/ may hold someone's real
+# account CSVs locally, so it never ships, examples included.
+data/
+.env
+.tokens
+*.tokens
+tokens.json
+.auth_tmp.json
+targets.json
+JOURNAL.md
+.venv/
+venv/
+tests/
+__pycache__/
+.pytest_cache/
+.claude/

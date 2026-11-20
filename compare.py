@@ -12,7 +12,7 @@ move with the hurdle rate; the gap between required and delivered does not.
 """
 import argparse, sys, os
 import sec_financials as sf
-from owner_earnings import build, owner_earnings
+from owner_earnings import build, owner_earnings, refusal, latest_shares
 
 M = 1e6
 
@@ -75,9 +75,8 @@ def choose_base(oe, fs):
 
 def analyse(ticker, price, bond, hurdle):
     name, cik, fys, d = build(ticker, 8)
-    fx = sf.get(sf.FACTS.format(cik=sf.resolve_cik(ticker)[0]))["facts"]
-    sh = sorted(fx["dei"]["EntityCommonStockSharesOutstanding"]["units"]["shares"],
-                key=lambda x: x.get("filed", ""))[-1]["val"]
+    fx = sf.get(sf.FACTS.format(cik=cik))["facts"]
+    sh = latest_shares(fx)
     oe = {f: owner_earnings(d, f)[0] for f in fys}
     oe = {f: v for f, v in oe.items() if v is not None}
     if not oe:
@@ -132,9 +131,69 @@ def analyse(ticker, price, bond, hurdle):
         "capex_over_da": (cpx / dep) if dep else None,
         "oe_over_fcf": oe_fcf,
         "ni_last": d["net_income"].get(last),
+        "oe_window": hist,
         "implied": implied_growth(norm, mcap, hurdle / 100.0),
         "bond": bond / 100.0,
     }
+
+
+def verdict(r):
+    """(code, label) for one analysed row. Refusals come first and replace the
+    gap reading; they never sit beside it.
+
+    Before 2026-11-20 a row whose delivered growth couldn't be computed (owner
+    earnings <= 0 at either end of the window) was dropped from the verdict
+    table without a word. FMC and KHC, the two impairment cases the refusals
+    exist for, were exactly those rows: they vanished instead of being refused.
+    """
+    oe_window = r.get("oe_window") or []
+    why = refusal(r.get("ni_last"), oe_window, r.get("oe_over_fcf")) if oe_window else None
+    if why:
+        return "refused", why
+    if r["implied"] is None:
+        return "no_reading", "no implied growth: normalised owner earnings <= 0"
+    if r["oe_cagr"] is None:
+        return "no_reading", ("no delivered growth: owner earnings <= 0 at the start "
+                              "or end of the window")
+    gap = r["implied"] - r["oe_cagr"]
+    if r["oe_cagr"] > 0.30:
+        return "do_not_extrapolate", "delivered CAGR >30% -- DO NOT EXTRAPOLATE"
+    if r["capex_over_da"] and r["capex_over_da"] > 1.15:
+        return "growth_capex", ("capex %.2fx D&A -- owner earnings understated, growth capex"
+                                % r["capex_over_da"])
+    return (("below_record", "CHEAP vs its own record") if gap < 0 else
+            ("improvement", "priced for improvement") if gap < 0.05 else
+            ("a_lot", "priced for a lot") if gap < 0.12 else
+            ("heroics", "priced for heroics"))
+
+
+def screen(pairs, bond, hurdle=8.0):
+    """[(ticker, price)] -> (rows, excluded), rows in the order given."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(pair):
+        t, px = pair
+        try:
+            return analyse(t.upper(), float(px), bond, hurdle)
+        except Exception as e:
+            return {"ticker": t.upper(), "error": str(e)[:60]}
+
+    # Each name is its own multi-MB SEC pull; four at a time stays well under
+    # SEC's 10 requests/second and turns a cold 8-name screen from ~16s into ~4s.
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        done = list(ex.map(one, pairs))
+    rows = [r for r in done if "error" not in r]
+    bad = [r for r in done if "error" in r]
+    for r in rows:
+        r["verdict"], r["verdict_label"] = verdict(r)
+        r["gap"] = (r["implied"] - r["oe_cagr"]
+                    if r["implied"] is not None and r["oe_cagr"] is not None else None)
+    return rows, bad
+
+
+def by_gap(rows):
+    """Most negative gap first (paying for less than it already does); no reading last."""
+    return sorted(rows, key=lambda r: (r["gap"] is None, r["gap"] if r["gap"] is not None else 0))
 
 
 def main():
@@ -144,16 +203,11 @@ def main():
     p.add_argument("--hurdle", type=float, default=8.0)
     a = p.parse_args()
 
-    rows = []
+    pairs = []
     for pr in a.pairs:
         t, _, px = pr.partition("=")
-        try:
-            rows.append(analyse(t.upper(), float(px), a.bond, a.hurdle))
-        except Exception as e:
-            rows.append({"ticker": t.upper(), "error": str(e)[:60]})
-
-    ok = [r for r in rows if "error" not in r]
-    bad = [r for r in rows if "error" in r]
+        pairs.append((t, px))
+    ok, bad = screen(pairs, a.bond, a.hurdle)
 
     pct = lambda v: "   n/a" if v is None else "%5.1f%%" % (100 * v)
     print("=" * 118)
@@ -172,40 +226,10 @@ def main():
 
     print("\n%-6s %-10s %-12s %-12s   %s" % ("", "implied g", "delivered g", "GAP", "verdict"))
     print("-" * 118)
-    scored = []
-    for r in ok:
-        if r["implied"] is None or r["oe_cagr"] is None:
-            continue
-        gap = r["implied"] - r["oe_cagr"]
-        scored.append((gap, r))
-    for gap, r in sorted(scored):
-        if r.get("ni_last") is not None and r["ni_last"] < 0:
-            print("%-6s %-10s %-12s %+11.1fpt   %s"
-                  % (r["ticker"], pct(r["implied"]), pct(r["oe_cagr"]), 100 * gap,
-                     "LOSS-MAKING in the latest year -- TOO HARD"))
-            continue
-        if r.get("oe_over_fcf") and (r["oe_over_fcf"] > 1.6 or r["oe_over_fcf"] < 0):
-            print("%-6s %-10s %-12s %+11.1fpt   %s"
-                  % (r["ticker"], pct(r["implied"]), pct(r["oe_cagr"]), 100 * gap,
-                     "owner earnings %.1fx actual FCF -- add-back is not cash, REFUSE"
-                     % r["oe_over_fcf"]))
-            continue
-        if r["oe_cagr"] and r["oe_cagr"] > 0.30:
-            v = "delivered CAGR >30% -- DO NOT EXTRAPOLATE"
-            print("%-6s %-10s %-12s %+11.1fpt   %s"
-                  % (r["ticker"], pct(r["implied"]), pct(r["oe_cagr"]), 100 * gap, v))
-            continue
-        if r["capex_over_da"] and r["capex_over_da"] > 1.15:
-            v = "capex %.2fx D&A -- owner earnings understated, growth capex" % r["capex_over_da"]
-            print("%-6s %-10s %-12s %+11.1fpt   %s"
-                  % (r["ticker"], pct(r["implied"]), pct(r["oe_cagr"]), 100 * gap, v))
-            continue
-        v = ("CHEAP vs its own record" if gap < 0 else
-             "priced for improvement" if gap < 0.05 else
-             "priced for a lot" if gap < 0.12 else
-             "priced for heroics")
-        print("%-6s %-10s %-12s %+11.1fpt   %s"
-              % (r["ticker"], pct(r["implied"]), pct(r["oe_cagr"]), 100 * gap, v))
+    for r in by_gap(ok):
+        gap = "%+11.1fpt" % (100 * r["gap"]) if r["gap"] is not None else "%11s  " % "n/a"
+        print("%-6s %-10s %-12s %s   %s"
+              % (r["ticker"], pct(r["implied"]), pct(r["oe_cagr"]), gap, r["verdict_label"]))
 
     print("\n  base used for owner earnings:")
     for r in ok:

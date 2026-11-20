@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://trading-harness-mcp.vercel.app/sitemap.xml

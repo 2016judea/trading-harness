@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trading Harness · a Claude connector</title>
+<meta name="description" content="What a business is worth against its price, from its SEC filings, and what your own trades actually did. A free Claude connector that calculates and places no orders.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/icon.png">
+<style>
+:root{--wall:#f4f1ea;--ink:#16211d;--muted:#5f6a64;--line:#d9d3c5;--accent:#13322a;--brass:#a8791b;--card:#fffdf8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--wall:#101714;--ink:#ece6d8;--muted:#9aa59f;--line:#26332d;--accent:#e2b649;--brass:#e2b649;--card:#16201c}}
+:root[data-theme="dark"]{color-scheme:dark;--wall:#101714;--ink:#ece6d8;--muted:#9aa59f;--line:#26332d;--accent:#e2b649;--brass:#e2b649;--card:#16201c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--wall);color:var(--ink);font:400 17px/1.55 "Avenir Next","Helvetica Neue",Helvetica,Arial,sans-serif;padding:0 20px}
+main{max-width:640px;margin:0 auto;padding-block:40px 56px}
+.mark{width:56px;height:56px;border-radius:14px;display:block}
+h1{font:600 clamp(30px,7vw,42px)/1.08 Georgia,"Times New Roman",serif;margin:20px 0 10px;letter-spacing:-.01em}
+.lede{font-size:19px;margin:0 0 22px}
+.url{display:flex;gap:8px;align-items:stretch;margin:0 0 8px}
+.url code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font:500 15px/1.3 ui-monospace,Menlo,monospace}
+.url button{border:0;border-radius:10px;background:var(--accent);color:var(--wall);font:600 15px/1 inherit;padding:0 18px;min-height:44px;cursor:pointer}
+.how{color:var(--muted);font-size:14px;margin:0 0 30px}
+h2{font:600 13px/1.2 inherit;letter-spacing:.08em;text-transform:uppercase;color:var(--brass);margin:30px 0 10px}
+ul{list-style:none;padding:0;margin:0}
+li{padding:11px 0;border-top:1px solid var(--line)}
+li b{display:block;font-weight:600}
+li span{color:var(--muted);font-size:15px}
+.ask{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 10px;font-size:16px}
+.never{margin-top:30px;padding:16px;border-left:3px solid var(--brass);background:var(--card);font-size:15px}
+footer{margin-top:34px;color:var(--muted);font-size:14px}
+a{color:var(--accent)}
+</style>
+<script>window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)}</script><script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<main>
+<img class="mark" src="/icon.png" alt="" width="56" height="56">
+<h1>Trading Harness</h1>
+<p class="lede">What a business is worth against its price, read off its SEC filings. And what your own trades actually did. In Claude, for free.</p>
+
+<div class="url"><code id="u">https://trading-harness-mcp.vercel.app/mcp</code><button id="c" type="button">Copy</button></div>
+<p class="how">In Claude: Settings → Connectors → Add custom connector, paste the address. No sign-in.</p>
+
+<h2>Ask it</h2>
+<p class="ask">“What growth is Coca-Cola’s price asking for, and has it ever done that?”</p>
+<p class="ask">“Here’s my E*TRADE transactions download. What did I actually make, by stock?”</p>
+<p class="ask">“Is the stop I wrote down actually resting on my biggest position?”</p>
+
+<h2>Six tools</h2>
+<ul>
+<li><b>As-reported financials</b><span>Ten years of a company’s 10-K lines, exactly as filed, each with the filing it came from.</span></li>
+<li><b>Owner earnings and reverse DCF</b><span>Buffett’s owner earnings, return on tangible capital, value anchors, and the growth the price requires. Refuses, with the reason, when there is nothing durable to value.</span></li>
+<li><b>Compare valuations</b><span>Up to eight companies ranked on growth the price requires minus growth delivered.</span></li>
+<li><b>Realized P&amp;L</b><span>Paste a transactions export: first-in-first-out, fees included, win rate and payoff.</span></li>
+<li><b>Stop coverage check</b><span>Paste positions and open orders: oversized positions with no stop, orders that die tonight, legs that over-commit.</span></li>
+<li><b>Rebalance order list</b><span>Paste positions and target weights: the dollar and share change per name, with the tax side of each exit.</span></li>
+</ul>
+
+<div class="never"><b>It calculates. It does not trade.</b> No brokerage login, no order placed or previewed, nothing you paste is stored. Prices come from you. Not investment advice.</div>
+
+<footer>
+<p>Open source: <a href="https://github.com/2016judea/trading-harness">github.com/2016judea/trading-harness</a> · <a href="/privacy">Privacy</a> · <a href="https://github.com/2016judea/trading-harness/issues">Support</a></p>
+<p>Brick and Mortar AI LLC, Saint Paul, Minnesota. Not affiliated with E*TRADE or any broker.</p>
+</footer>
+</main>
+<script>
+document.getElementById('c').addEventListener('click',function(){var b=this,t=document.getElementById('u').textContent;
+try{navigator.clipboard.writeText(t).then(function(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy'},1600)})}catch(e){}
+try{window.va('event',{name:'copy_connector_url'})}catch(e){}});
+</script>
+</body>
+</html>

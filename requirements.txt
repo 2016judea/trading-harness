@@ -2,4 +2,5 @@ requests
 requests-oauthlib
 python-dotenv
 pandas
+tzdata
 pytest

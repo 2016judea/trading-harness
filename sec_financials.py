@@ -19,11 +19,22 @@ from collections import OrderedDict
 # SEC requires a real contact address in the User-Agent and BLOCKS clients
 # without one (blocks, not rate-limits). Set your own before first use:
 #   export SEC_USER_AGENT="Your Name you@example.com"
-UA = os.environ.get("SEC_USER_AGENT", "")
-if not UA:
-    sys.exit("Set SEC_USER_AGENT, e.g.\n"
-             '  export SEC_USER_AGENT="Your Name you@example.com"\n'
-             "SEC blocks requests that do not identify a contact.")
+#
+# Read at fetch time, not import time: the connector (api/mcp.py) imports this
+# module, and a server that dies on import can't even say what it's missing.
+NO_CONTACT = ("Set SEC_USER_AGENT, e.g.\n"
+              '  export SEC_USER_AGENT="Your Name you@example.com"\n'
+              "SEC blocks requests that do not identify a contact.")
+
+
+class MissingContact(RuntimeError):
+    """SEC_USER_AGENT is unset. The CLIs exit with NO_CONTACT; the server says so."""
+
+
+class TickerNotFound(LookupError):
+    """Not in SEC's company_tickers.json: not a US filer, or not a ticker."""
+
+
 TICKERS = "https://www.sec.gov/files/company_tickers.json"
 FACTS = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json"
 
@@ -93,26 +104,51 @@ FLOWS = {"revenue","gross_profit","operating_income","net_income","cfo","capex",
          "cogs"}
 
 
-CACHE = os.path.join(os.path.expanduser("~"), ".cache", "sec-financials")
 CACHE_TTL = 86400          # a day; 10-Ks do not change hourly
+
+
+def _cache_dir():
+    """~/.cache/sec-financials, or SEC_CACHE_DIR. A serverless function has a
+    read-only home and a writable /tmp, so fall back to the temp dir."""
+    import tempfile
+    for d in (os.environ.get("SEC_CACHE_DIR"),
+              os.path.join(os.path.expanduser("~"), ".cache", "sec-financials"),
+              os.path.join(tempfile.gettempdir(), "sec-financials")):
+        if not d:
+            continue
+        try:
+            os.makedirs(d, exist_ok=True)
+            if os.access(d, os.W_OK):
+                return d
+        except OSError:
+            continue
+    return None
+
+
+CACHE = _cache_dir()
 
 
 def get(url):
     """Cached fetch. companyfacts payloads run to several MB and a screen of 30
     names would otherwise pull ~200MB and get throttled."""
-    os.makedirs(CACHE, exist_ok=True)
-    key = os.path.join(CACHE, hashlib.md5(url.encode()).hexdigest() + ".json")
-    if os.path.exists(key) and (time.time() - os.path.getmtime(key)) < CACHE_TTL:
+    key = os.path.join(CACHE, hashlib.md5(url.encode()).hexdigest() + ".json") if CACHE else None
+    if key and os.path.exists(key) and (time.time() - os.path.getmtime(key)) < CACHE_TTL:
         with open(key) as f:
             return json.load(f)
     data = _fetch(url)
-    with open(key, "w") as f:
-        json.dump(data, f)
+    if key:
+        tmp = "%s.%d.tmp" % (key, os.getpid())
+        with open(tmp, "w") as f:
+            json.dump(data, f)
+        os.replace(tmp, key)   # atomic: two threads fetching one name never read half a file
     return data
 
 
 def _fetch(url):
-    req = urllib.request.Request(url, headers={"User-Agent": UA,
+    ua = os.environ.get("SEC_USER_AGENT", "")
+    if not ua:
+        raise MissingContact(NO_CONTACT)
+    req = urllib.request.Request(url, headers={"User-Agent": ua,
                                                "Accept-Encoding": "gzip, deflate"})
     with urllib.request.urlopen(req, timeout=60) as r:
         raw = r.read()
@@ -122,10 +158,12 @@ def _fetch(url):
 
 
 def resolve_cik(ticker):
+    # SEC writes share classes with a hyphen (BRK-B); people write BRK.B.
+    want = ticker.upper().strip().replace(".", "-")
     for row in get(TICKERS).values():
-        if row["ticker"].upper() == ticker.upper():
+        if row["ticker"].upper() == want:
             return int(row["cik_str"]), row["title"]
-    sys.exit("ticker %s not found in SEC company_tickers.json" % ticker)
+    raise TickerNotFound("ticker %s not found in SEC company_tickers.json" % ticker)
 
 
 def annual(facts, tags, is_flow):
@@ -241,6 +279,13 @@ def fmt(v):
 
 
 def main():
+    try:
+        _main()
+    except (MissingContact, TickerNotFound) as e:
+        sys.exit(str(e))
+
+
+def _main():
     p = argparse.ArgumentParser()
     p.add_argument("ticker"); p.add_argument("--years", type=int, default=10)
     p.add_argument("--concept"); p.add_argument("--json", action="store_true")

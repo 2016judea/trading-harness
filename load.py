@@ -18,7 +18,14 @@ MARKET_TZ = "America/New_York"
 
 
 def load(path: str | Path = "data/transactions.csv") -> pd.DataFrame:
-    df = pd.read_csv(path)
+    return normalize(pd.read_csv(path))
+
+
+def normalize(df: pd.DataFrame) -> pd.DataFrame:
+    """Everything load() does after reading the file. The connector
+    (connector/inputs.py) maps a pasted broker export onto these columns and
+    calls this, so a pasted CSV and a pulled one go through the same rules."""
+    df = df.copy()
 
     # E*TRADE returns epoch timestamps. 13-digit values are ms, 10-digit are s;
     # detect per-column from the median magnitude so either works on real data.

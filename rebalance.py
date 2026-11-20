@@ -35,29 +35,44 @@ from pathlib import Path
 import pandas as pd
 
 
-def _load_targets(path: str | Path) -> dict:
-    cfg = json.loads(Path(path).read_text())
+def check_targets(cfg: dict, label: str = "targets") -> dict:
+    """Raises ValueError on a targets dict that can't be planned. The CLI turns
+    it into an exit; the connector returns it as the answer."""
     if "targets" not in cfg:
-        raise SystemExit(f"{path}: missing required key 'targets'")
+        raise ValueError(f"{label}: missing required key 'targets'")
     total_pct = sum(cfg["targets"].values())
     if total_pct > 1.0 + 1e-9:
-        raise SystemExit(
-            f"{path}: targets sum to {total_pct:.1%} of investable capital, which is "
+        raise ValueError(
+            f"{label}: targets sum to {total_pct:.1%} of investable capital, which is "
             "over 100%. Weights are fractions (0.15 = 15%), not percentages."
         )
     return cfg
+
+
+def _load_targets(path: str | Path) -> dict:
+    try:
+        return check_targets(json.loads(Path(path).read_text()), str(path))
+    except ValueError as e:
+        raise SystemExit(str(e))
 
 
 def plan(portfolio_csv: str | Path = "data/portfolio.csv",
          targets_path: str | Path = "targets.json") -> tuple[pd.DataFrame, dict]:
     """Return (order_list, summary). Positive delta_$ = buy, negative = sell."""
     cfg = _load_targets(targets_path)
+    try:
+        return plan_frame(pd.read_csv(portfolio_csv), cfg)
+    except ValueError as e:
+        raise SystemExit(str(e))
+
+
+def plan_frame(df: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, dict]:
+    """plan() on a positions frame and a checked targets dict."""
     targets: dict[str, float] = cfg["targets"]
     prices: dict[str, float] = cfg.get("prices", {})
     cash_on_hand = float(cfg.get("cash_on_hand", 0))
     cash_reserve = float(cfg.get("cash_reserve", 0))
 
-    df = pd.read_csv(portfolio_csv)
     # One row per (account, symbol): a name held in two accounts is two rows,
     # and a dict built straight off the columns keeps only the last one. The
     # total still counted both, so the name read under-held and the plan said
@@ -72,7 +87,7 @@ def plan(portfolio_csv: str | Path = "data/portfolio.csv",
     total = df["marketValue"].sum() + cash_on_hand
     investable = total - cash_reserve
     if investable <= 0:
-        raise SystemExit(
+        raise ValueError(
             f"cash_reserve (${cash_reserve:,.0f}) is >= total capital "
             f"(${total:,.0f}) — nothing left to allocate."
         )
