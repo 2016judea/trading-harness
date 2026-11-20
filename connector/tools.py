@@ -307,6 +307,11 @@ def _bond(args):
     return b["pct"], b
 
 
+NO_SEC = ("This server's SEC contact (SEC_USER_AGENT) is not configured, so SEC filings can't "
+          "be read right now. The bring-your-own-data tools still work. Report it at "
+          f"{REPO}/issues")
+
+
 def _sec(fn):
     try:
         return fn()
@@ -314,9 +319,7 @@ def _sec(fn):
         raise ToolError(str(e) + ". Only companies that file with the SEC are covered "
                         "(US-listed, including foreign filers of 20-F/40-F).")
     except sf.MissingContact:
-        raise ToolError("This server's SEC contact (SEC_USER_AGENT) is not configured, so "
-                        "SEC filings can't be read right now. The bring-your-own-data tools "
-                        f"still work. Report it at {REPO}/issues")
+        raise ToolError(NO_SEC)
     except treasury.BondUnavailable as e:
         raise ToolError(str(e))
     except KeyError as e:
@@ -509,7 +512,7 @@ def compare_valuations(args):
 
     bond, meta, rows, bad = _sec(run)
     if bad and all("SEC_USER_AGENT" in r.get("error", "") for r in bad) and not rows:
-        raise ToolError("SEC filings can't be read right now (server contact not configured).")
+        raise ToolError(NO_SEC)
     ranked = cmp.by_gap(rows)
     out_rows = [{
         "ticker": r["ticker"], "name": r["name"], "price": r["price"],

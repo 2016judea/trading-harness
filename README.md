@@ -1,5 +1,7 @@
 # trading-harness
 
+**Live:** https://trading-harness-mcp.vercel.app
+
 Pull your own E*TRADE account over the API, work out what actually happened, and
 decide the next trade *before* you're in it.
 
@@ -25,6 +27,34 @@ Three parts, and you can take any one of them:
 
 **Nothing here can place a trade.** Every script reads, computes and prints. The
 order lists are lists — you type the orders yourself.
+
+## Use it in Claude: the connector
+
+The parts that need no brokerage login also run as a remote MCP server, so anyone can
+use them from a Claude chat: **`https://trading-harness-mcp.vercel.app/mcp`** (Settings →
+Connectors → Add custom connector; no sign-in).
+
+| Tool | What it returns | Wraps |
+|---|---|---|
+| `as_reported_financials` | a company's 10-K lines as filed, with the XBRL tag and filing behind each | `sec_financials.py` |
+| `owner_earnings_valuation` | owner earnings, return on tangible capital, value anchors, reverse DCF, or a refusal with its reason | `owner_earnings.py` |
+| `compare_valuations` | 2-8 companies ranked on growth the price requires minus growth delivered | `compare.py` |
+| `realized_pnl` | FIFO realized P&L from a pasted transactions export | `realized_pnl.py` |
+| `stop_coverage_check` | pasted positions + open orders (+ journal) checked for missing stops and orders that die tonight | `gate_check.py` |
+| `rebalance_order_list` | pasted positions + target weights → dollar and share changes, tax side of each exit | `rebalance.py` |
+
+The connector is a thin layer ([`connector/`](connector/), [`api/mcp.py`](api/mcp.py)) over the
+same functions the scripts call, so the CLI and the chat can't disagree. Pasted exports can be
+E*TRADE's own download, the CSVs this repo writes, or plain columns (date, action, symbol,
+quantity, price, fee); each answer says which columns it used and which rows it set aside.
+
+What it never does: hold a brokerage login, place or preview an order, call a model, or keep
+what you paste. The share price comes from you or your Claude; the long-bond yield defaults to
+Treasury's latest 30-year par yield. `tests/test_connector.py` pins all of that offline;
+`TH_LIVE=1 python -m pytest tests/test_live_endpoint.py` and `python3 scripts/live_cases.py`
+call the deployed server. Running your own copy needs `SEC_USER_AGENT` set in its environment
+(`scripts/set_sec_contact.sh` does it for the Vercel project). Privacy:
+https://trading-harness-mcp.vercel.app/privacy
 
 ## Valuation, without credentials or a key
 
@@ -333,6 +363,16 @@ in `etrade-pull`, and everything else just links to it.
 
 It also implies a division of labor, which this repo takes literally: the
 analysis decides and shows its grounds, and **you** place the order.
+
+## Expectation
+
+Written 2026-11-20, before the connector is listed (BUSINESS.md rule 2). The five small
+connectors we listed on the Claude directory on 2026-11-19 and 11-20 (Appeal Draft, Breach to
+Claim, Tip & Overtime, Classic Literature, Marginalia Corpus) logged 3 to 20 tool calls a day
+in their first two days, most of them our own checks. Expected for this one: **under 100
+non-test tool calls in the 30 days after the listing reads Published**, from fewer than 10
+people. Read it on **2026-12-28** from PostHog (`mcp_tool_call`, `site = trading-harness-mcp`,
+`test` unset) and the directory's own usage tab.
 
 ## Notes
 
