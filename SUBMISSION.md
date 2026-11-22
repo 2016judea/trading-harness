@@ -122,7 +122,7 @@ Nothing was paid, nothing was sent to a person. Status read back off the portal 
 
 | Where | Status | UTC | Listing / ID |
 |---|---|---|---|
-| Claude Connectors Directory | **IN REVIEW** | 18:08 | claude.ai/directory/manage/trading-harness · slug `trading-harness` (permanent) |
+| Claude Connectors Directory | **PUBLISHED**, live at claude.ai/directory/trading-harness (read off claude.ai/directory/manage 2026-11-22 14:55 UTC; approved 2026-11-20 18:10 by automated review; `scripts/live_cases.py` 11 pass, 0 blocked the same morning) | 18:08 filed | claude.ai/directory/manage/trading-harness · slug `trading-harness` (permanent) |
 
 **What was filed.** Custom connector "Trading Harness" added to his Claude from the form's own "Add custom
 connector": connected, 6 tools, 0 resources, auth none (detected), no tool flagged. Name, slug, one-liner and
@@ -135,7 +135,7 @@ no sponsored content. Self-tested: all six tools run through MCP Inspector CLI 0
 (the three valuation tools answered "SEC contact not configured", see the live run above). All seven compliance
 boxes ticked after reading them; reviewer note as above.
 
-**What needs Aidan.**
+**What needs Aidan.** *(2026-11-22: both done. The SEC contact was set 2026-11-20 and the live cases run 11 pass, 0 blocked; the listing reads Published.)*
 1. **Now:** `~/Desktop/workspace/trading-harness/scripts/set_sec_contact.sh "Trading Harness <your contact email>"`.
    SEC 403s any client without an email-shaped contact, and the address is his to choose, so it was not set for
    him. The script sets the encrypted Vercel env, redeploys, and reruns the live cases.
