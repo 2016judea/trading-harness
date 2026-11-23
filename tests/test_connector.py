@@ -116,11 +116,17 @@ def text(r):
 
 # ---------------------------------------------------------------- listing rules
 
-def test_six_tools_each_titled_read_only_and_annotated():
+DOOR_NAMES = ["is_this_stock_undervalued", "growth_priced_into_stock", "which_stock_is_cheapest",
+              "free_cash_flow_history", "dividends_and_buybacks",
+              "short_vs_long_term_capital_gains", "wash_sale_check",
+              "tax_loss_harvest_candidates", "trading_win_rate", "positions_without_stop_loss"]
+
+
+def test_six_engines_plus_theme_doors_each_titled_read_only_and_annotated():
     t = rpc("tools/list")["result"]["tools"]
     assert [x["name"] for x in t] == ["as_reported_financials", "owner_earnings_valuation",
                                       "compare_valuations", "realized_pnl",
-                                      "stop_coverage_check", "rebalance_order_list"]
+                                      "stop_coverage_check", "rebalance_order_list"] + DOOR_NAMES
     for x in t:
         a = x["annotations"]
         assert x["title"] and a["title"] == x["title"]
@@ -343,3 +349,51 @@ def test_bad_arguments_get_a_sentence_back():
     assert r["isError"] and "2 to 8" in text(r)
     r = call("owner_earnings_valuation", ticker="KO", price="seventy")
     assert r["isError"] and "number" in text(r)
+
+
+# ---------------------------------------------------------------- theme doors
+
+def test_door_wraps_its_engine_with_the_same_numbers():
+    a = call("is_this_stock_undervalued", ticker="HLTH", price=20, long_bond_pct=5)["structuredContent"]
+    b = call("owner_earnings_valuation", ticker="HLTH", price=20, long_bond_pct=5)["structuredContent"]
+    assert a["midpoint_per_share"] == b["midpoint_per_share"]
+    g = call("growth_priced_into_stock", ticker="HLTH", price=20, long_bond_pct=5)
+    assert text(g).startswith("Growth the price requires")
+
+
+def test_free_cash_flow_is_operating_cash_flow_less_capex():
+    r = call("free_cash_flow_history", ticker="HLTH")
+    rows = r["structuredContent"]["rows"]
+    assert rows and all(x["free_cash_flow"] == x["cfo"] - x["capex"] for x in rows if x["cfo"])
+
+
+SPLIT = """date,action,symbol,quantity,price,fee
+2024-01-02,Buy,AAA,10,100,0
+2024-06-03,Sell,AAA,10,90,0
+2024-06-20,Buy,AAA,10,92,0
+2023-01-03,Buy,BBB,5,50,0
+2024-03-01,Sell,BBB,5,70,0
+"""
+
+
+def test_short_and_long_term_split_by_the_one_year_line():
+    s = call("short_vs_long_term_capital_gains", transactions_csv=SPLIT)["structuredContent"]
+    y = next(r for r in s["by_year"] if r["tax_year"] == 2024)
+    assert y["short"]["net"] == -100 and y["long"]["net"] == 100
+
+
+def test_wash_sale_finds_the_buyback_inside_30_days():
+    s = call("wash_sale_check", transactions_csv=SPLIT)["structuredContent"]
+    assert [h["symbol"] for h in s["possible_wash_sales"]] == ["AAA"]
+
+
+def test_harvest_lists_only_losers():
+    pos = "symbol,quantity,marketValue,totalGain\nAAA,10,900,-100\nBBB,5,350,100\n"
+    s = call("tax_loss_harvest_candidates", positions_csv=pos)["structuredContent"]
+    assert [c["symbol"] for c in s["candidates"]] == ["AAA"] and s["total_unrealized_loss"] == -100
+
+
+def test_door_schema_misses_get_a_sentence_and_a_loggable_detail():
+    from connector import tools as T
+    text_, _, info, err = T.call("wash_sale_check", {"csv": "x"})
+    assert err and "transactions_csv" in text_ and info["err_detail"].startswith("wash_sale_check:")

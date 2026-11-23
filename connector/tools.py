@@ -1,4 +1,4 @@
-"""The six connector tools: definitions (what tools/list returns) and the calls.
+"""The six engine tools (plus the theme doors in themes.py): definitions (what tools/list returns) and the calls.
 
 Every number comes from a script that already exists in this repo, so the CLI
 and the connector can't disagree:
@@ -58,6 +58,10 @@ SERVER_INSTRUCTIONS = (
     "it used and which rows it set aside. In stop_coverage_check an UNCHECKED row is not a "
     "passing row. An order list from rebalance_order_list is arithmetic, not an order: "
     "the person places any trade themselves at their broker. "
+    "Ten shortcuts answer common questions on the same engines: is_this_stock_undervalued, "
+    "growth_priced_into_stock, which_stock_is_cheapest, free_cash_flow_history, "
+    "dividends_and_buybacks, short_vs_long_term_capital_gains, wash_sale_check, "
+    "tax_loss_harvest_candidates, trading_win_rate, positions_without_stop_loss. "
     "This is not investment advice; say so when the person is deciding a trade. "
     f"Source code and issues: {REPO}"
 )
@@ -789,7 +793,20 @@ def call(name: str, args: dict):
     args = dict(args or {})
     try:
         check_args(name, args)
+    except ToolError as e:
+        # Schema misses carry only our own words and an argument name, never a pasted
+        # value, so they are safe to log and say which argument callers get wrong.
+        return str(e), None, {"err": "input", "err_detail": str(e)[:120]}, True
+    try:
         text, structured, info = IMPL[name](args)
         return text, structured, info, False
     except (ToolError, inputs.InputError) as e:
         return str(e), None, {"err": "input"}, True
+
+
+# Theme doors (connector/themes.py): named front doors over the six engines above.
+from . import themes as _themes  # noqa: E402  (imports this module, so it loads last)
+
+TOOLS += _themes.DOORS
+IMPL.update(_themes.IMPL)
+TOOL_NAMES = [t["name"] for t in TOOLS]

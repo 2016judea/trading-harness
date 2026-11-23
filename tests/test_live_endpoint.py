@@ -38,9 +38,9 @@ def call(name, **args):
     return r
 
 
-def test_tools_list_is_the_six_read_only_tools():
+def test_tools_list_is_the_sixteen_read_only_tools():
     tools = rpc("tools/list")["result"]["tools"]
-    assert len(tools) == 6
+    assert len(tools) == 16
     assert all(t["annotations"]["readOnlyHint"] and not t["annotations"]["destructiveHint"] for t in tools)
 
 

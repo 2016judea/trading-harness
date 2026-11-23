@@ -2,7 +2,7 @@
 
 POST /mcp takes one JSON-RPC message and answers with JSON. No sessions and no
 SSE, because every tool is a pure calculation: nothing to stream, nothing to
-remember. GET /mcp describes the server. The six tools live in connector/tools.py.
+remember. GET /mcp describes the server. The tools live in connector/tools.py and connector/themes.py.
 
 What never happens here: a brokerage call, an order (placed, previewed or
 staged), a model call, or a write of anything pasted. One anonymous analytics
@@ -11,6 +11,7 @@ event per tool call carries the tool name, timing and row counts, never content.
 from __future__ import annotations
 
 import json
+import re
 import os
 import sys
 import time
@@ -45,7 +46,7 @@ def log_call(props: dict, ua: str, test: bool) -> None:
     if os.environ.get("TH_NO_ANALYTICS"):
         return
     safe = {k: props[k] for k in ("tool", "ok", "ms", "err", "n_rows", "n_lots", "n_tickers",
-                                  "refused", "critical") if props.get(k) is not None}
+                                  "refused", "critical", "err_detail", "attempted") if props.get(k) is not None}
     body = {"api_key": PH_KEY, "event": "mcp_tool_call", "distinct_id": "mcp_" + uuid.uuid4().hex,
             "properties": {**safe, "client": _client(ua), "test": True if test else None,
                            "site": "trading-harness-mcp", "$host": "trading-harness-mcp.vercel.app",
@@ -88,6 +89,9 @@ def handle(msg: dict, ua: str = "", test: bool = False):
     if method == "tools/call":
         name = params.get("name")
         if name not in tools.IMPL:
+            # Which tool names callers reach for that don't exist: the cheapest gap signal.
+            log_call({"tool": "unknown", "ok": False, "err": "unknown_tool",
+                      "attempted": re.sub(r"[^A-Za-z0-9_.-]", "", str(name))[:60]}, ua, test)
             return {"jsonrpc": "2.0", "id": mid,
                     "error": {"code": -32602, "message": f"Unknown tool: {name}"}}
         t0 = time.time()
