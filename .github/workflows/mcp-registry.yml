@@ -1,0 +1,24 @@
+name: mcp-registry
+# Publishes server.json to the official MCP Registry (registry.modelcontextprotocol.io) as
+# io.github.2016judea/trading-harness. GitHub Actions OIDC proves the repo owner, so no device code, token or
+# secret is needed. Runs when server.json changes; bump "version" there for every new publish
+# (the registry refuses a version it already holds).
+on:
+  push:
+    branches: [main]
+    paths: [server.json]
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install mcp-publisher
+        run: curl -sL https://github.com/modelcontextprotocol/registry/releases/download/v1.8.9/mcp-publisher_linux_amd64.tar.gz | tar xz mcp-publisher
+      - run: ./mcp-publisher login github-oidc
+      - run: ./mcp-publisher publish
+      - name: read it back
+        run: curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.2016judea/trading-harness" | head -c 1500

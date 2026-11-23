@@ -141,3 +141,5 @@ boxes ticked after reading them; reviewer note as above.
    him. The script sets the encrypted Vercel env, redeploys, and reruns the live cases.
 2. **When it reads "Ready to publish":** Publish at claude.ai/directory/manage/trading-harness (approval does not
    publish). Pending item `trading-harness-directory-publish` (due 2026-11-23) chases both.
+
+**Official MCP Registry (2026-11-22):** `io.github.2016judea/trading-harness` 1.0.0, remote `https://trading-harness-mcp.vercel.app/mcp`; `.github/workflows/mcp-registry.yml` republishes on every `server.json` version bump. Check: `curl "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.2016judea/trading-harness"`.

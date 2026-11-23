@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.2016judea/trading-harness",
+  "title": "Trading Harness",
+  "description": "Value a company from its SEC filings, and check your own trades, stops and rebalance math",
+  "version": "1.0.0",
+  "websiteUrl": "https://trading-harness-mcp.vercel.app/",
+  "repository": {
+    "url": "https://github.com/2016judea/trading-harness",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://trading-harness-mcp.vercel.app/mcp"
+    }
+  ]
+}
