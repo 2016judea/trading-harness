@@ -167,7 +167,7 @@ def _wash_sales(a):
              f"**{len(hits)} had the same symbol bought within 30 days before or after the sale.**"]
     for h in hits:
         lines.append(f"- {h['symbol']}: sold {h['qty_sold']} on {h['sell_date']} for a "
-                     f"{T._usd(h['loss'])} loss; bought again " +
+                     f"{T._usd(abs(h['loss']))} loss; bought again " +
                      ", ".join(f"{p['qty']} on {p['date']}" for p in h["repurchases"]))
     lines += ["", "A screen on this export: same ticker only (not 'substantially identical' "
                   "funds), this account only (not an IRA or a spouse's account). The broker's "
