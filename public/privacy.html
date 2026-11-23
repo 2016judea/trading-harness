@@ -21,26 +21,41 @@ a{color:var(--accent)} p.m{color:var(--muted);font-size:14px}
 <body>
 <main>
 <h1>Privacy</h1>
-<p class="m">Last updated November 20, 2026. Trading Harness, by Brick and Mortar AI LLC, Saint Paul, Minnesota. Not affiliated with E*TRADE or any broker.</p>
+<p class="m">Last updated November 22, 2026. Trading Harness is run by Brick and Mortar AI LLC, Saint Paul, Minnesota, the data controller for this connector and these pages. Not affiliated with E*TRADE or any broker.</p>
 
 <h2>No account, no brokerage access</h2>
 <p>The connector needs no sign-in and never asks for brokerage credentials. It has no connection to any broker and cannot place, preview or change an order.</p>
 
-<h2>What it receives, and what it keeps</h2>
-<p>It receives only what the assistant sends with a tool call: a ticker and a price, or the CSV text of an export you chose to paste (transactions, positions, open orders, and optionally journal text). That text is read in memory to compute the answer and dropped when the call ends. It is not written to disk, logged, or shared. The connector does not receive your conversation.</p>
+<h2>What it receives</h2>
+<p>Only what your assistant (Claude, ChatGPT or another app) sends with a tool call: a ticker and a price, or the CSV text of an export you chose to paste (transactions, positions, open orders, and optionally journal text). The connector does not receive your conversation, your name, your email or your account with that app.</p>
+
+<h2>What it does with it, and how long it keeps it</h2>
+<p>The text is read in memory to compute the answer and dropped when the call ends, usually within a second. It is not written to disk, logged, used to train any model, sold, or shared. No model runs on our side: the arithmetic is code.</p>
 
 <h2>Where the numbers come from</h2>
-<p>Company figures come from the SEC's public XBRL API (data.sec.gov), and the long-bond yield from the U.S. Treasury's daily par yield curve (home.treasury.gov). Neither request carries anything about you. Share prices come from you or your assistant.</p>
+<p>Company figures come from the SEC's public XBRL API (data.sec.gov), and the long-bond yield from the U.S. Treasury's daily par yield curve (home.treasury.gov). Those requests carry the ticker and nothing about you. Share prices come from you or your assistant.</p>
 
 <h2>What is counted</h2>
-<p>Each tool call sends one anonymous event to PostHog: which tool, whether it worked, how long it took, how many rows or companies it handled, and which app made the call (Claude, ChatGPT and so on, read from the user agent). No tickers, no amounts, no CSV content. Each event gets a random ID, so calls can't be linked to each other or to a person, and no IP address is stored with it.</p>
-<p>These pages use Vercel Web Analytics, which counts visits without cookies.</p>
+<p>Each tool call sends one anonymous event to PostHog: which tool, whether it worked, how long it took, how many rows or companies it handled, and which app made the call (Claude, ChatGPT and so on, read from the user agent). No tickers, no amounts, no CSV content. Each event gets a random ID, so calls can't be linked to each other or to a person, and no IP address is stored with it. These events are kept while the connector runs, to see which tools are used and which fail.</p>
+<p>These pages use Vercel Web Analytics, which counts visits without cookies and without storing an IP address.</p>
+
+<h2>Who else handles it</h2>
+<p>Vercel hosts the server and these pages, and keeps short-lived request logs (time, path, IP address) under its own privacy policy. PostHog stores the anonymous events above. Nothing is shared with anyone else, and nothing is sold.</p>
+
+<h2>Your choices</h2>
+<p>Paste only what you want calculated; you can remove account numbers and names first, and the tools still work. You can disconnect the connector in your app's settings at any time. Because nothing kept here identifies you, there is no personal data held to access, export or delete. Write to us if you want that confirmed.</p>
+
+<h2>Children</h2>
+<p>The connector is not meant for anyone under 18 and does not knowingly receive their information.</p>
 
 <h2>Not advice</h2>
 <p>The tools calculate from public filings and the data you provide. Nothing they return is investment, tax or legal advice.</p>
 
+<h2>Changes</h2>
+<p>If this policy changes, the date at the top changes with it.</p>
+
 <h2>Contact</h2>
-<p>Questions and problems: <a href="https://github.com/2016judea/trading-harness/issues">github.com/2016judea/trading-harness/issues</a></p>
+<p>Questions, problems or privacy requests: <a href="https://brickandmortar.dev/contact">brickandmortar.dev/contact</a>.</p>
 </main>
 </body>
 </html>

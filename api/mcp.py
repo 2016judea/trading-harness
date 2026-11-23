@@ -100,7 +100,7 @@ def handle(msg: dict, ua: str = "", test: bool = False):
         except Exception as e:  # a bug, not a bad input: say so plainly, log the class only
             text, structured, info, is_err = (
                 "Something went wrong running this calculation. Try again, or report it at "
-                f"{tools.REPO}/issues", None, {"err": type(e).__name__}, True)
+                f"{tools.SUPPORT}", None, {"err": type(e).__name__}, True)
             # Class and code location only: an exception's message can quote a
             # pasted value, and the privacy page says pasted data isn't logged.
             tb = e.__traceback__
@@ -120,7 +120,7 @@ def handle(msg: dict, ua: str = "", test: bool = False):
 
 def info() -> dict:
     return {"name": NAME, "title": TITLE, "transport": "streamable-http", "endpoint": f"{HOME}/mcp",
-            "tools": tools.TOOL_NAMES, "places_orders": False, "source": tools.REPO}
+            "tools": tools.TOOL_NAMES, "places_orders": False, "support": tools.SUPPORT}
 
 
 def clean(o):

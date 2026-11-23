@@ -31,7 +31,7 @@ import sec_financials as sf
 
 from . import inputs, treasury
 
-REPO = "https://github.com/2016judea/trading-harness"
+SUPPORT = "https://brickandmortar.dev/contact"
 NOT_ADVICE = ("Calculated from SEC filings and the data provided. Not investment advice. "
               "Nothing here can place or preview an order.")
 
@@ -62,8 +62,7 @@ SERVER_INSTRUCTIONS = (
     "growth_priced_into_stock, which_stock_is_cheapest, free_cash_flow_history, "
     "dividends_and_buybacks, short_vs_long_term_capital_gains, wash_sale_check, "
     "tax_loss_harvest_candidates, trading_win_rate, positions_without_stop_loss. "
-    "This is not investment advice; say so when the person is deciding a trade. "
-    f"Source code and issues: {REPO}"
+    "This is not investment advice; say so when the person is deciding a trade."
 )
 
 RO = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True}
@@ -313,7 +312,7 @@ def _bond(args):
 
 NO_SEC = ("This server's SEC contact (SEC_USER_AGENT) is not configured, so SEC filings can't "
           "be read right now. The bring-your-own-data tools still work. Report it at "
-          f"{REPO}/issues")
+          f"{SUPPORT}")
 
 
 def _sec(fn):

@@ -2,7 +2,40 @@
   "buildCommand": "echo build",
   "outputDirectory": "public",
   "cleanUrls": true,
-  "rewrites": [{ "source": "/mcp", "destination": "/api/mcp" }],
-  "functions": { "api/mcp.py": { "maxDuration": 60, "memory": 2048 } },
-  "headers": [{ "source": "/api/(.*)", "headers": [{ "key": "cache-control", "value": "no-store" }] }]
+  "rewrites": [
+    {
+      "source": "/mcp",
+      "destination": "/api/mcp"
+    },
+    {
+      "source": "/.well-known/openai-apps-challenge",
+      "destination": "/api/openai-challenge"
+    }
+  ],
+  "functions": {
+    "api/mcp.py": {
+      "maxDuration": 60,
+      "memory": 2048
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "cache-control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/demo/(.*)",
+      "headers": [
+        {
+          "key": "x-robots-tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
+  ]
 }

@@ -1,0 +1,115 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "trading-harness",
+  "version": "1.0.0",
+  "description": "Trading Harness does the arithmetic of an owner's-earnings investor from a company's SEC filings and from the person's own broker exports. Give it a ticker and a share price: it reads the 10-K figures exactly as filed, computes owner earnings (net income plus depreciation and amortisation, minus capital spending), return on tangible capital, and a reverse DCF, the growth the share price requires. It declines, with the reason, when a business has no durable earning power to value. It compares up to eight companies on growth required versus growth delivered, and shows free cash flow, dividends and buybacks year by year. Paste a transactions or positions CSV and it works out realized profit and loss first-in-first-out, short- versus long-term gains, wash sales, tax-loss candidates, win rate, whether each large position has a stop actually resting, and the share changes to reach target weights. It calculates only: it has no brokerage connection, places no orders, and keeps nothing that is pasted. Not investment advice.",
+  "author": {
+    "name": "Brick and Mortar AI LLC",
+    "url": "https://trading-harness-mcp.vercel.app/"
+  },
+  "homepage": "https://trading-harness-mcp.vercel.app/",
+  "license": "LicenseRef-All-Rights-Reserved",
+  "keywords": [
+    "SEC filings",
+    "valuation",
+    "owner earnings",
+    "realized P&L",
+    "wash sale"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Trading Harness",
+        "shortDescription": "SEC valuation and trade math",
+        "longDescription": "Trading Harness does the arithmetic of an owner's-earnings investor from a company's SEC filings and from the person's own broker exports. Give it a ticker and a share price: it reads the 10-K figures exactly as filed, computes owner earnings (net income plus depreciation and amortisation, minus capital spending), return on tangible capital, and a reverse DCF, the growth the share price requires. It declines, with the reason, when a business has no durable earning power to value. It compares up to eight companies on growth required versus growth delivered, and shows free cash flow, dividends and buybacks year by year. Paste a transactions or positions CSV and it works out realized profit and loss first-in-first-out, short- versus long-term gains, wash sales, tax-loss candidates, win rate, whether each large position has a stop actually resting, and the share changes to reach target weights. It calculates only: it has no brokerage connection, places no orders, and keeps nothing that is pasted. Not investment advice.",
+        "developerName": "Brick and Mortar AI LLC",
+        "category": "Finance",
+        "capabilities": [],
+        "websiteURL": "https://trading-harness-mcp.vercel.app/",
+        "supportURL": "https://brickandmortar.dev/contact",
+        "privacyPolicyURL": "https://trading-harness-mcp.vercel.app/privacy",
+        "termsOfServiceURL": "https://brickandmortar.dev/license/",
+        "defaultPrompt": [
+          "What growth is Coca-Cola's share price asking for at $70?",
+          "Compare KO at $70, PEP at $150 and KDP at $33.",
+          "Here's my transactions CSV. What did I actually make?"
+        ],
+        "logo": "./assets/logo.png",
+        "composerIcon": "./assets/composer-icon.png",
+        "composerIconDark": "./assets/composer-icon-dark.png"
+      },
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Reverse DCF on one company from its filings",
+              "prompt": "What growth is Coca-Cola's share price asking for at $70?",
+              "tools_triggered": [
+                "owner_earnings_valuation"
+              ],
+              "expected_behavior": "Returns KO's owner earnings by fiscal year from its 10-K filings, return on tangible capital, value anchors and a reverse DCF at four required returns, with the 30-year Treasury yield and its date. The assistant quotes the numbers as returned and says it is not investment advice."
+            },
+            {
+              "description": "Compare three companies",
+              "prompt": "Compare KO at $70, PEP at $150 and KDP at $33 on how much growth each price requires.",
+              "tools_triggered": [
+                "compare_valuations"
+              ],
+              "expected_behavior": "Returns the three companies ranked by growth required minus owner-earnings growth delivered, each with its reading."
+            },
+            {
+              "description": "Financial statements exactly as filed",
+              "prompt": "Show me Corteva's last five years as filed with the SEC, plus trailing twelve months.",
+              "tools_triggered": [
+                "as_reported_financials"
+              ],
+              "expected_behavior": "Returns fiscal years 2021-2025 line by line with the XBRL tag for each line and the form and accession number for each year, plus a trailing-twelve-month column."
+            },
+            {
+              "description": "Realized P&L from a pasted broker export",
+              "prompt": "Here's my E*TRADE transactions download. What did I actually make?\n\nTransactionDate,TransactionType,SecurityType,Symbol,Quantity,Amount,Price,Commission,Description\n11/14/25,Sold,EQ,KO,-100,6984.50,69.85,0.50,COCA COLA CO\n01/06/25,Bought,EQ,KO,100,-6120.00,61.20,0,COCA COLA CO\n",
+              "tools_triggered": [
+                "realized_pnl"
+              ],
+              "expected_behavior": "Reads the CSV as an E*TRADE download and returns one closed KO lot, first-in-first-out, net realized about $864 after the $0.50 commission, and which columns it used."
+            },
+            {
+              "description": "Plain-language valuation question",
+              "prompt": "Is Coca-Cola undervalued at $70 a share?",
+              "tools_triggered": [
+                "is_this_stock_undervalued"
+              ],
+              "expected_behavior": "Returns the same owner-earnings valuation as the reverse DCF tool with a plain reading of what the price implies; the assistant notes the verdict depends on the hurdle rate and is not investment advice."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Placing a trade",
+              "prompt": "Sell 100 shares of KO for me at market.",
+              "expected_behavior": "No tool is called. Trading Harness has no brokerage connection and no tool that places, previews or stages an order; the assistant says the person places trades at their broker."
+            },
+            {
+              "description": "A live quote",
+              "prompt": "What is Apple's stock price right now?",
+              "expected_behavior": "No tool is called. The tools have no price feed; a live quote comes from elsewhere."
+            },
+            {
+              "description": "Unrelated personal finance",
+              "prompt": "Help me plan a monthly grocery budget for a family of four.",
+              "expected_behavior": "No tool is called. Nothing in this app covers household budgeting."
+            }
+          ]
+        },
+        "demo_recording_url": "https://trading-harness-mcp.vercel.app/demo/chatgpt",
+        "commerce": false,
+        "commerce_description": "No purchase or payment happens in ChatGPT, and no tool offers, prices or links to one."
+      },
+      "publication": {
+        "countries": [
+          "US"
+        ],
+        "release_notes": "1.0.0: first ChatGPT release. Sixteen read-only tools: valuation from SEC filings (owner earnings, reverse DCF, comparisons, cash-flow history) and arithmetic on pasted broker exports (realized P&L, gains by holding period, wash sales, tax-loss candidates, stop coverage, rebalancing). No sign-in; no brokerage connection."
+      }
+    }
+  }
+}
