@@ -168,3 +168,20 @@ ZIP: `chatgpt-plugin.zip`, built by `python3 scripts/build_chatgpt_plugin.py --l
 | `positions_without_stop_loss` | True | False | False | Pure arithmetic on CSV text the person pastes into the chat; it makes no outside request, stores nothing and changes nothing. |
 | `rebalance_order_list` | True | False | False | Returns the dollar and share changes to reach target weights as arithmetic on pasted positions. It has no brokerage connection and cannot place, preview or stage an order. |
 <!-- /chatgpt-hints -->
+
+## xAI marketplace (Grok Bot, Cursor, Grok) — SUBMITTED 2026-11-23
+
+Filed 2026-11-23T02:26:03Z at x.ai/bot/marketplace/submit-a-plugin; the page answered "Thanks for submitting your plugin!".
+Status: pending review (xAI replies by email to the work address). Destinations ticked: Grok (coming soon), Grok Bot,
+Cursor. Org Brick and Mortar AI LLC, handle `brickandmortar`. Name Trading Harness. Website https://trading-harness-mcp.vercel.app/.
+Logo https://trading-harness-mcp.vercel.app/icon-solid.png (solid plate, 1:1). MCP URL https://trading-harness-mcp.vercel.app/mcp (the URL, never a repo). Cursor's Publisher Terms §3.1
+bar charging users "directly or indirectly" through the plugin; the connector itself is free.
+
+Description (585 chars):
+
+> Trading Harness does the arithmetic of an owner's-earnings investor, from SEC filings and the person's own broker exports. Give it a ticker and a share price: it reads the 10-K figures as filed, computes owner earnings, return on tangible capital and a reverse DCF (the growth the price requires), and compares up to eight companies. Paste a transactions or positions CSV and it works out realized P&L, short- vs long-term gains, wash sales, tax-loss candidates, stop coverage and rebalancing share counts. It only calculates: no brokerage connection, no orders. Not investment advice.
+
+Testing (525 chars):
+
+> No account or credentials needed. Add the MCP URL as a remote server, then try: 1) "What growth is Coca-Cola's share price asking for at $70?" -> owner earnings by fiscal year from KO's 10-Ks, return on tangible capital and a reverse DCF. 2) "Compare KO at $70, PEP at $150 and KDP at $33 on how much growth each price requires." -> the three ranked by growth required minus growth delivered. 3) "Show me Corteva's last five years as filed with the SEC." -> fiscal 2021-2025 line by line with XBRL tags and accession numbers.
+
